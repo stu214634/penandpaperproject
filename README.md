@@ -35,23 +35,6 @@ Locations are defined in `data/locations.json`:
 }
 ```
 
-## Usage
-
-1. **Map Navigation**
-   - Left-click drag to pan
-   - Mouse wheel to zoom
-   - Click locations for details
-
-2. **Audio Controls**
-   - Volume slider in bottom-right
-   - Speaker icon toggles mute
-   - Automatic music transitions between locations
-
-3. **Inventory Management**
-   - Access character inventories through NPC interaction
-   - Merchant shops show item prices
-   - Drag-and-drop item transfer (WIP)
-
 ## Contributing
 
 1. Fork the repository
