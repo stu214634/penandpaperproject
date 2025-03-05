@@ -1,63 +1,90 @@
-# DM Companion
+# Pen & Paper RPG Companion Tool
 
-A web-based tool for Dungeon Masters to manage their campaign locations, characters, and ambient music.
+A digital companion for tabletop RPG sessions featuring interactive maps, ambient audio management, and location tracking.
 
 ## Features
 
-- **Location Management**: Create and manage locations with descriptions and background music
-- **Character Database**: Keep track of NPCs and merchants
-- **Interactive Map**: Place and manage locations on a customizable map
-- **Audio System**: Play background music and ambient sounds for different locations
-- **Dashboard**: Get an overview of your campaign elements
+🌍 **Interactive Map System**
+- Pan/Zoom map interface with fog-of-war effect
+- Location tracking with coordinates
+- Nested sublocations and parent-child relationships
+- Dynamic location connections
 
-## Setup
+🎵 **Ambient Audio Management**
+- Background music per location
+- Smooth audio crossfading between locations
+- Volume control slider
+- Loopable audio tracks
+- 2-second fade-in/out transitions
 
-1. Clone the repository
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
+📦 **Inventory System**
+- Character inventories
+- Merchant NPCs with item prices
+- Item quantity management
 
-3. Create a `.env` file in the root directory with the following variables:
-   ```
-   REACT_APP_MAPBOX_TOKEN=your_mapbox_token_here
-   ```
-   Get your Mapbox token from [Mapbox](https://www.mapbox.com/)
+👥 **Character Management**
+- NPC/Merchant differentiation
+- Character descriptions and profiles
+- UUID-based entity management
 
-4. Start the development server:
-   ```bash
-   npm run dev
-   ```
+## Tech Stack
 
-## Project Structure
+- **Frontend**: React + TypeScript
+- **State Management**: Zustand
+- **Audio**: Howler.js
+- **Mapping**: React-map-gl (Mapbox)
+- **UI**: Material-UI (MUI)
+- **Build**: Vite
 
+## Installation
+
+```bash
+git clone https://github.com/stu214634/penandpaperproject.git
+cd penandpaperproject
+npm install
+npm run dev
 ```
-src/
-  ├── components/     # Reusable UI components
-  ├── pages/         # Main view components
-  ├── store/         # State management
-  ├── theme.ts       # UI theme configuration
-  └── App.tsx        # Main application component
+
+## Data Structure
+
+Locations are defined in `data/locations.json`:
+```json
+{
+  "id": "forest_clearing",
+  "name": "Ancient Forest Clearing",
+  "description": "A mystical forest clearing...",
+  "backgroundMusic": "/audio/forest_ambience.mp3",
+  "coordinates": [45, 32],
+  "inventory": [...],
+  "sublocations": [...]
+}
 ```
 
-## Technologies Used
+## Usage
 
-- React 18
-- TypeScript
-- Vite
-- Material-UI
-- React Map GL
-- Howler.js (audio)
-- Zustand (state management)
+1. **Map Navigation**
+   - Left-click drag to pan
+   - Mouse wheel to zoom
+   - Click locations for details
+
+2. **Audio Controls**
+   - Volume slider in bottom-right
+   - Speaker icon toggles mute
+   - Automatic music transitions between locations
+
+3. **Inventory Management**
+   - Access character inventories through NPC interaction
+   - Merchant shops show item prices
+   - Drag-and-drop item transfer (WIP)
 
 ## Contributing
 
 1. Fork the repository
-2. Create your feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a new Pull Request
+2. Create feature branch (`git checkout -b feature/foo`)
+3. Commit changes (`git commit -am 'Add some foo'`)
+4. Push to branch (`git push origin feature/foo`)
+5. Open a Pull Request
 
 ## License
 
-MIT
+MIT © 2024 stu214634
