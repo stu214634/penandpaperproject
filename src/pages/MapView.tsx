@@ -25,6 +25,7 @@ import NorthIcon from '@mui/icons-material/North';
 import Slider from '@mui/material/Slider';
 import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import VolumeOffIcon from '@mui/icons-material/VolumeOff';
+import { Howl } from 'howler';
 
 export const MapView: React.FC = () => {
   const locations = useStore((state) => state.locations);
@@ -48,10 +49,21 @@ export const MapView: React.FC = () => {
       setSelectedLocation(location);
       setShowDetails(true);
       
+      // Play entry sound if available
+      if (location.entrySound) {
+        const entrySound = new Howl({
+          src: [`/audio/${location.entrySound}`],
+          loop: false,
+          volume: useStore.getState().volume,
+        });
+        entrySound.play();
+      }
+      
       if (location.backgroundMusic) {
         const audioPath = `/audio/${location.backgroundMusic}`;
-        console.log('Playing:', audioPath);
-        playTrack(audioPath);
+        const isSublocation = !!location.parentLocationId;
+        const replace = !(isSublocation && location.mixWithParent);
+        playTrack(audioPath, { replace });
       }
     } else {
       setShowDetails(!showDetails);

@@ -12,6 +12,8 @@ export interface CustomLocation {
   name: string;
   description: string;
   backgroundMusic?: string;
+  entrySound?: string;
+  mixWithParent?: boolean;
   coordinates?: [number, number];
   inventory?: Item[];
   sublocations?: CustomLocation[];
@@ -58,7 +60,7 @@ interface StoreState {
   addCharacter: (character: Omit<Character, 'id'>) => void;
   addAudioTrack: (track: Omit<AudioTrack, 'id'>) => void;
   setCurrentLocation: (locationId: string) => void;
-  playTrack: (url: string) => void;
+  playTrack: (url: string, options?: { replace?: boolean }) => void;
   stopTrack: () => void;
   getSublocationsByParentId: (parentLocationId: string) => CustomLocation[];
   getAllTopLevelLocations: () => CustomLocation[];
@@ -116,32 +118,39 @@ export const useStore = create<StoreState>((set, get) => ({
     set({ volume });
   },
 
-  playTrack: (url: string) => {
+  playTrack: (url: string, options?: { replace?: boolean }) => {
     const { currentHowl, volume } = get();
+    const replace = options?.replace ?? true;
     
-    // Fade out and stop existing track
-    if (currentHowl) {
+    // Only fade out existing track if replacing
+    if (replace && currentHowl) {
       currentHowl.fade(volume, 0, 2000);
       currentHowl.once('fade', () => {
         currentHowl.stop();
       });
     }
 
-    // Create new looped track
+    // Create new track with loop configuration
     const newHowl = new Howl({
       src: [url],
-      loop: true, // Enable infinite looping
+      loop: !options?.replace, // Only loop if not replacing
       volume: volume,
       onplay: () => {
         set({ currentHowl: newHowl, isPlaying: true });
       },
       onend: () => {
-        set({ isPlaying: false });
+        if (options?.replace) {
+          set({ isPlaying: false });
+        }
       }
     });
 
     // Start playback with fade-in
-    newHowl.fade(0, volume, 2000);
+    if (replace) {
+      newHowl.fade(0, volume, 2000);
+    } else {
+      newHowl.volume(volume);
+    }
     newHowl.play();
   },
 

@@ -22,6 +22,9 @@
     "id": "1-1",
     "name": "Crimson Chalice Tavern",
     "description": "A raucous hub of activity where adventurers gather. The air smells of ale and roasted boar, with bardic ballads competing with dice games at oakwood tables.",
+    "entrySound": "doorcreak.mp3",
+    "backgroundMusic": "whispers.mp3",
+    "mixWithParent": true,
     "parentLocationId": "1",
     "coordinates": [0.6, 0.6],
     "notableNPCs": [
