@@ -1,0 +1,76 @@
+[
+  {
+    "id": "1",
+    "name": "Main City",
+    "description": "The sprawling capital city of the realm, surrounded by towering marble walls and buzzing with activity. Golden spires of the royal palace pierce the clouds, while bustling market squares echo with merchants' cries.",
+    "coordinates": [0.5, 0.5],
+    "connectedLocations": ["2", "3"],
+    "backgroundMusic": "raindreary.mp3",
+    "population": "Approx. 50,000",
+    "rulingHouse": "House Aurelion",
+    "notableFeatures": [
+      "Grand Bazaar",
+      "Royal Academy of Arcana",
+      "Cathedral of the Dawn",
+      "Dragonfang Keep"
+    ],
+    "climate": "Temperate",
+    "primaryExports": ["Textiles", "Magic Artifacts", "Fine Wines"],
+    "factionsPresent": ["Merchant's Guild", "Mages College", "Thieves' Union"]
+  },
+  {
+    "id": "1-1",
+    "name": "Crimson Chalice Tavern",
+    "description": "A raucous hub of activity where adventurers gather. The air smells of ale and roasted boar, with bardic ballads competing with dice games at oakwood tables.",
+    "parentLocationId": "1",
+    "coordinates": [0.6, 0.6],
+    "notableNPCs": [
+      {"name": "Grundar", "role": "Barkeeper", "quote": "What'll it be - ale, mead, or trouble?"},
+      {"name": "Lirael", "role": "Bard", "quote": "Coin a song, stranger?"}
+    ]
+  },
+  {
+    "id": "2",
+    "name": "Mordor",
+    "description": "A dark and dangerous land.",
+    "coordinates": [200, 800],
+    "connectedLocations": ["1", "3"],
+    "backgroundMusic": "rainquiet.mp3"
+  },
+  {
+    "id": "3",
+    "name": "Nordor",
+    "description": "A dark and dangerous land.",
+    "coordinates": [-800, 200],
+    "connectedLocations": ["1", "2"],
+    "backgroundMusic": "potbreak.mp3"
+  },
+  {
+    "id": "3-1",
+    "name": "Tavern",
+    "description": "Busy marketplace area",
+    "parentLocationId": "3",
+    "coordinates": [0.6, 0.6]
+  },
+  {
+    "id": "1-2",
+    "name": "Market District",
+    "description": "A labyrinth of stalls selling exotic wares from distant lands. Spice merchants argue with silk traders while urchins pick pockets in the crowd.",
+    "parentLocationId": "1",
+    "coordinates": [0.55, 0.62],
+    "specialGoods": [
+      "Dragonbone carvings",
+      "Elixirs of Night Vision",
+      "Crystalized Phoenix Tears"
+    ]
+  },
+  {
+    "id": "1-3",
+    "name": "Royal Palace Grounds",
+    "description": "Immaculate gardens guarded by golden-armored sentinels. The marble palace shimmers with protective enchantments visible as violet ripples in the air.",
+    "parentLocationId": "1",
+    "coordinates": [0.48, 0.53],
+    "accessRequirement": "Royal Invitation",
+    "hiddenAreas": ["Royal Menagerie", "Vault of Prophecies"]
+  }
+] 

@@ -1,0 +1,118 @@
+{
+  "hash": "69d39cc6",
+  "configHash": "6e550a87",
+  "lockfileHash": "471625f6",
+  "browserHash": "7f26a424",
+  "optimized": {
+    "react/jsx-dev-runtime": {
+      "src": "../../node_modules/react/jsx-dev-runtime.js",
+      "file": "react_jsx-dev-runtime.js",
+      "fileHash": "32b7d11b",
+      "needsInterop": true
+    },
+    "react": {
+      "src": "../../node_modules/react/index.js",
+      "file": "react.js",
+      "fileHash": "74eeb239",
+      "needsInterop": true
+    },
+    "react-dom/client": {
+      "src": "../../node_modules/react-dom/client.js",
+      "file": "react-dom_client.js",
+      "fileHash": "3da23a08",
+      "needsInterop": true
+    },
+    "react-router-dom": {
+      "src": "../../node_modules/react-router-dom/dist/index.js",
+      "file": "react-router-dom.js",
+      "fileHash": "d3febbc7",
+      "needsInterop": false
+    },
+    "@mui/material": {
+      "src": "../../node_modules/@mui/material/index.js",
+      "file": "@mui_material.js",
+      "fileHash": "1a2f7964",
+      "needsInterop": false
+    },
+    "@mui/material/styles": {
+      "src": "../../node_modules/@mui/material/styles/index.js",
+      "file": "@mui_material_styles.js",
+      "fileHash": "94edfce3",
+      "needsInterop": false
+    },
+    "@mui/icons-material/Map": {
+      "src": "../../node_modules/@mui/icons-material/Map.js",
+      "file": "@mui_icons-material_Map.js",
+      "fileHash": "f429f1df",
+      "needsInterop": true
+    },
+    "@mui/icons-material/LocationOn": {
+      "src": "../../node_modules/@mui/icons-material/LocationOn.js",
+      "file": "@mui_icons-material_LocationOn.js",
+      "fileHash": "a345999f",
+      "needsInterop": true
+    },
+    "@mui/icons-material/People": {
+      "src": "../../node_modules/@mui/icons-material/People.js",
+      "file": "@mui_icons-material_People.js",
+      "fileHash": "02430092",
+      "needsInterop": true
+    },
+    "@mui/icons-material/Dashboard": {
+      "src": "../../node_modules/@mui/icons-material/Dashboard.js",
+      "file": "@mui_icons-material_Dashboard.js",
+      "fileHash": "198f6a8a",
+      "needsInterop": true
+    },
+    "react-map-gl": {
+      "src": "../../node_modules/react-map-gl/dist/esm/index.js",
+      "file": "react-map-gl.js",
+      "fileHash": "e6f8f924",
+      "needsInterop": false
+    },
+    "@mui/icons-material/Add": {
+      "src": "../../node_modules/@mui/icons-material/Add.js",
+      "file": "@mui_icons-material_Add.js",
+      "fileHash": "83f9e7eb",
+      "needsInterop": true
+    },
+    "zustand": {
+      "src": "../../node_modules/zustand/esm/index.mjs",
+      "file": "zustand.js",
+      "fileHash": "58c23c5a",
+      "needsInterop": false
+    },
+    "howler": {
+      "src": "../../node_modules/howler/dist/howler.js",
+      "file": "howler.js",
+      "fileHash": "756ad442",
+      "needsInterop": true
+    }
+  },
+  "chunks": {
+    "mapbox-gl-QSWTIJHI": {
+      "file": "mapbox-gl-QSWTIJHI.js"
+    },
+    "chunk-E5ODL3YF": {
+      "file": "chunk-E5ODL3YF.js"
+    },
+    "chunk-VVIP2QTE": {
+      "file": "chunk-VVIP2QTE.js"
+    },
+    "chunk-UBEF2AY5": {
+      "file": "chunk-UBEF2AY5.js"
+    },
+    "chunk-7DY7Y2WD": {
+      "file": "chunk-7DY7Y2WD.js"
+    },
+    "chunk-YIPV5V4J": {
+      "file": "chunk-YIPV5V4J.js"
+    },
+    "chunk-65KY755N": {
+      "file": "chunk-65KY755N.js"
+    },
+    "chunk-V4OQ3NZ2": {
+      "file": "chunk-V4OQ3NZ2.js"
+    }
+  }
+}

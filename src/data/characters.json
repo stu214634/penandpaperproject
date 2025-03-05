@@ -1,0 +1,14 @@
+[
+  {
+    "id": "1",
+    "name": "Gandalf",
+    "description": "A wise wizard.",
+    "type": "npc"
+  },
+  {
+    "id": "2",
+    "name": "Bilbo Baggins",
+    "description": "A hobbit adventurer.",
+    "type": "npc"
+  }
+] 
