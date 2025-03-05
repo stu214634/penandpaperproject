@@ -7,7 +7,6 @@ A digital companion for tabletop RPG sessions featuring interactive maps, ambien
 - **Frontend**: React + TypeScript
 - **State Management**: Zustand
 - **Audio**: Howler.js
-- **Mapping**: React-map-gl (Mapbox)
 - **UI**: Material-UI (MUI)
 - **Build**: Vite
 
