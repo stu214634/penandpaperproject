@@ -2,31 +2,6 @@
 
 A digital companion for tabletop RPG sessions featuring interactive maps, ambient audio management, and location tracking.
 
-## Features
-
-🌍 **Interactive Map System**
-- Pan/Zoom map interface with fog-of-war effect
-- Location tracking with coordinates
-- Nested sublocations and parent-child relationships
-- Dynamic location connections
-
-🎵 **Ambient Audio Management**
-- Background music per location
-- Smooth audio crossfading between locations
-- Volume control slider
-- Loopable audio tracks
-- 2-second fade-in/out transitions
-
-📦 **Inventory System**
-- Character inventories
-- Merchant NPCs with item prices
-- Item quantity management
-
-👥 **Character Management**
-- NPC/Merchant differentiation
-- Character descriptions and profiles
-- UUID-based entity management
-
 ## Tech Stack
 
 - **Frontend**: React + TypeScript
@@ -87,4 +62,4 @@ Locations are defined in `data/locations.json`:
 
 ## License
 
-MIT © 2024 stu214634
+MIT © 2025 stu214634
