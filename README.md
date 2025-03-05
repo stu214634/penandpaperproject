@@ -34,15 +34,3 @@ Locations are defined in `data/locations.json`:
   "sublocations": [...]
 }
 ```
-
-## Contributing
-
-1. Fork the repository
-2. Create feature branch (`git checkout -b feature/foo`)
-3. Commit changes (`git commit -am 'Add some foo'`)
-4. Push to branch (`git push origin feature/foo`)
-5. Open a Pull Request
-
-## License
-
-MIT © 2025 stu214634
