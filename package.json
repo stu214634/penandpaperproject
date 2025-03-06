@@ -21,12 +21,16 @@
     "react-map-gl": "^7.1.7",
     "react-router-dom": "^6.21.3",
     "react-zoom-pan-pinch": "^3.7.0",
+    "uuid": "^11.1.0",
     "zustand": "^4.5.0"
   },
   "devDependencies": {
+    "@types/file-saver": "^2.0.7",
     "@types/howler": "^2.2.12",
+    "@types/jszip": "^3.4.0",
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
+    "@types/uuid": "^10.0.0",
     "@typescript-eslint/eslint-plugin": "^6.14.0",
     "@typescript-eslint/parser": "^6.14.0",
     "@vitejs/plugin-react": "^4.2.1",

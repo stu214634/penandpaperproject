@@ -1,0 +1,161 @@
+import React, { useState, useEffect } from 'react';
+import { Box, Typography, Paper, Slider, IconButton, List, ListItem, Divider, Collapse } from '@mui/material';
+import { VolumeOff, VolumeUp, Close, ExpandMore, ExpandLess } from '@mui/icons-material';
+import { useStore } from '../store';
+
+export const AudioTrackPanel: React.FC = () => {
+  const activeTracks = useStore((state) => state.activeTracks);
+  const toggleMuteTrack = useStore((state) => state.toggleMuteTrack);
+  const stopIndividualTrack = useStore((state) => state.stopIndividualTrack);
+  const setTrackVolume = useStore((state) => state.setTrackVolume);
+  const volume = useStore((state) => state.volume);
+  const setVolume = useStore((state) => state.setVolume);
+  const [isMasterMuted, setIsMasterMuted] = useState(false);
+  const [previousVolume, setPreviousVolume] = useState(volume || 0.7);
+  const [expandedTracks, setExpandedTracks] = useState<Record<string, boolean>>({});
+
+  // Update previousVolume when volume changes and not muted
+  useEffect(() => {
+    if (!isMasterMuted && volume > 0) {
+      setPreviousVolume(volume);
+    }
+  }, [volume, isMasterMuted]);
+
+  if (activeTracks.length === 0) return null;
+
+  const handleMasterMute = () => {
+    if (isMasterMuted) {
+      // Unmute - restore previous volume
+      setVolume(previousVolume);
+    } else {
+      // Remember current volume before muting
+      if (volume > 0) {
+        setPreviousVolume(volume);
+      }
+      // Mute - set volume to 0
+      setVolume(0);
+    }
+    setIsMasterMuted(!isMasterMuted);
+  };
+
+  const handleVolumeChange = (_: Event, newValue: number | number[]) => {
+    const newVolumeValue = newValue as number;
+    setVolume(newVolumeValue);
+    
+    // If the user is adjusting volume to above 0, and we're muted, unmute
+    if (isMasterMuted && newVolumeValue > 0) {
+      setIsMasterMuted(false);
+    }
+    
+    // If the user sets volume to 0, mute
+    if (newVolumeValue === 0 && !isMasterMuted) {
+      setIsMasterMuted(true);
+    }
+  };
+  
+  const handleTrackVolumeChange = (trackId: string) => (_: Event, newValue: number | number[]) => {
+    setTrackVolume(trackId, newValue as number);
+  };
+  
+  const toggleTrackExpand = (trackId: string) => {
+    setExpandedTracks(prev => ({
+      ...prev,
+      [trackId]: !prev[trackId]
+    }));
+  };
+
+  return (
+    <Paper sx={{
+      position: 'fixed',
+      bottom: 20,
+      left: 20,
+      p: 2,
+      maxWidth: 320,
+      maxHeight: '300px',
+      overflowY: 'auto',
+      backgroundColor: 'rgba(45, 45, 45, 0.9)',
+      zIndex: 1000,
+      borderRadius: '8px',
+      boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
+    }}>
+      <Typography variant="h6" gutterBottom>
+        Audio Controls
+      </Typography>
+      
+      {/* Master Volume Control */}
+      <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+        <IconButton onClick={handleMasterMute} size="small">
+          {volume === 0 ? <VolumeOff fontSize="small" /> : <VolumeUp fontSize="small" />}
+        </IconButton>
+        
+        <Typography variant="body2" sx={{ minWidth: 80 }}>
+          Master Volume
+        </Typography>
+        
+        <Slider
+          size="small"
+          value={volume}
+          onChange={handleVolumeChange}
+          min={0}
+          max={1}
+          step={0.01}
+          sx={{ ml: 1 }}
+        />
+      </Box>
+
+      <Divider sx={{ my: 2 }} />
+
+      <Typography variant="subtitle1" gutterBottom>
+        Active Tracks
+      </Typography>
+      
+      <List dense>
+        {activeTracks.map((track) => (
+          <React.Fragment key={track.id}>
+            <ListItem sx={{ gap: 1, px: 0 }}>
+              <IconButton onClick={() => toggleMuteTrack(track.id)} size="small">
+                {track.isMuted ? <VolumeOff fontSize="small" /> : <VolumeUp fontSize="small" />}
+              </IconButton>
+              
+              <Typography 
+                variant="body2" 
+                sx={{ flex: 1, cursor: 'pointer' }}
+                onClick={() => toggleTrackExpand(track.id)}
+              >
+                {track.name}
+              </Typography>
+              
+              <IconButton 
+                size="small" 
+                onClick={() => toggleTrackExpand(track.id)}
+              >
+                {expandedTracks[track.id] ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
+              </IconButton>
+
+              <IconButton onClick={() => stopIndividualTrack(track.id)} size="small">
+                <Close fontSize="small" />
+              </IconButton>
+            </ListItem>
+            
+            <Collapse in={expandedTracks[track.id]} timeout="auto" unmountOnExit>
+              <Box sx={{ pl: 4, pr: 2, pb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography variant="caption" sx={{ minWidth: 60 }}>
+                  Volume
+                </Typography>
+                <Slider
+                  size="small"
+                  value={track.volume}
+                  onChange={handleTrackVolumeChange(track.id)}
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  sx={{ ml: 1 }}
+                />
+              </Box>
+            </Collapse>
+          </React.Fragment>
+        ))}
+      </List>
+    </Paper>
+  );
+}; 

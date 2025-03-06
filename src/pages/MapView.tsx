@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Box, 
   Typography, 
@@ -11,7 +11,11 @@ import {
   Collapse,
   ListItemButton,
   ListItemIcon,
-  Tooltip
+  Tooltip,
+  CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import AddIcon from '@mui/icons-material/Add';
@@ -22,10 +26,16 @@ import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { useStore } from '../store';
 import { CustomLocation } from '../store';
 import NorthIcon from '@mui/icons-material/North';
-import Slider from '@mui/material/Slider';
-import VolumeUpIcon from '@mui/icons-material/VolumeUp';
-import VolumeOffIcon from '@mui/icons-material/VolumeOff';
 import { Howl } from 'howler';
+import { AudioTrackPanel } from '../components/AudioTrackPanel';
+import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
+import KeyboardArrowLeftIcon from '@mui/icons-material/KeyboardArrowLeft';
+import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import { useNavigate } from 'react-router-dom';
+import { AssetDropZone } from '../components/AssetDropZone';
+import { AssetManager } from '../services/assetManager';
+import ImageNotSupportedIcon from '@mui/icons-material/ImageNotSupported';
 
 export const MapView: React.FC = () => {
   const locations = useStore((state) => state.locations);
@@ -33,16 +43,48 @@ export const MapView: React.FC = () => {
   const stopTrack = useStore((state) => state.stopTrack);
   const getSublocationsByParentId = useStore((state) => state.getSublocationsByParentId);
   const getAllTopLevelLocations = useStore((state) => state.getAllTopLevelLocations);
+  const refreshAssets = useStore((state) => state.refreshAssets);
+  const hasAssets = useStore((state) => state.hasAssets);
+  const isLoading = useStore((state) => state.isLoading);
   
   // State for location and details
   const [selectedLocation, setSelectedLocation] = useState<CustomLocation | null>(null);
   const [showDetails, setShowDetails] = useState(false);
+  // Asset manager panel is shown by default if no assets are available
+  const [showAssetManager, setShowAssetManager] = useState(!hasAssets);
+  
+  // Additional state for image loading
+  const [isImageLoading, setIsImageLoading] = useState(false);
+  
+  // Additional checks for the empty state
+  const hasLocations = locations.length > 0;
   
   // Reference to the map container for calculating relative coordinates
   const mapContainerRef = useRef<HTMLDivElement>(null);
   
+  // Background image handling with state
+  const [imageUrl, setImageUrl] = useState<string>('');
+  
+  // Effect to load the image when the selected location changes
+  useEffect(() => {
+    if (selectedLocation) {
+      const loadImage = async () => {
+        setIsImageLoading(true);
+        try {
+          const url = await AssetManager.getAssetUrl('images', `${selectedLocation.id}.jpg`);
+          setImageUrl(url);
+        } catch (error) {
+          console.error('Error loading image:', error);
+        } finally {
+          setIsImageLoading(false);
+        }
+      };
+      loadImage();
+    }
+  }, [selectedLocation?.id]);
+  
   // Handle location selection
-  const handleLocationClick = (location: CustomLocation, e: React.MouseEvent) => {
+  const handleLocationClick = async (location: CustomLocation, e: React.MouseEvent) => {
     e.stopPropagation();
     
     if (selectedLocation?.id !== location.id) {
@@ -51,22 +93,52 @@ export const MapView: React.FC = () => {
       
       // Play entry sound if available
       if (location.entrySound) {
-        const entrySound = new Howl({
-          src: [`/audio/${location.entrySound}`],
-          loop: false,
-          volume: useStore.getState().volume,
-        });
-        entrySound.play();
+        const soundUrl = await AssetManager.getAssetUrl('audio', location.entrySound);
+        
+        // Only try to play the sound if a URL was returned
+        if (soundUrl) {
+          const locationSound = new Howl({
+            src: [soundUrl],
+            loop: false,
+            volume: useStore.getState().volume,
+          });
+          locationSound.play();
+        }
       }
       
       if (location.backgroundMusic) {
+        // Use AssetManager to check if the audio exists before trying to play it
         const audioPath = `/audio/${location.backgroundMusic}`;
         const isSublocation = !!location.parentLocationId;
-        const replace = !(isSublocation && location.mixWithParent);
-        playTrack(audioPath, { replace });
+        // Only pass replace: false if this is a sublocation with mixWithParent: true
+        const replace = !(isSublocation && location.mixWithParent === true);
+        playTrack(audioPath, { 
+          replace: replace, 
+          locationId: location.id 
+        });
       }
     } else {
       setShowDetails(!showDetails);
+    }
+  };
+
+  // Handle asset import
+  const handleAssetImport = async () => {
+    // Refresh the data in the store
+    await refreshAssets();
+    
+    // Reset the selected location to force a re-render
+    if (selectedLocation) {
+      const locationId = selectedLocation.id;
+      setSelectedLocation(null);
+      
+      // Find the location in the refreshed data
+      setTimeout(() => {
+        const refreshedLocation = locations.find(loc => loc.id === locationId);
+        if (refreshedLocation) {
+          setSelectedLocation(refreshedLocation);
+        }
+      }, 100);
     }
   };
   
@@ -306,6 +378,73 @@ export const MapView: React.FC = () => {
       });
   };
   
+  // Loading state for the entire application
+  if (isLoading) {
+    return (
+      <Box 
+        sx={{ 
+          height: 'calc(100vh - 64px)', 
+          display: 'flex', 
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: 'background.default'
+        }}
+      >
+        <CircularProgress size={60} />
+        <Typography variant="h6" sx={{ mt: 2 }}>
+          Loading your campaign...
+        </Typography>
+      </Box>
+    );
+  }
+
+  // Render the empty state when no assets or locations are available
+  if (!hasLocations) {
+    return (
+      <Box 
+        sx={{ 
+          height: 'calc(100vh - 64px)', 
+          display: 'flex', 
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 4,
+          backgroundColor: 'background.default'
+        }}
+      >
+        <Paper
+          elevation={3}
+          sx={{
+            maxWidth: 600,
+            width: '100%',
+            p: 4,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            backgroundColor: 'rgba(45, 45, 45, 0.9)',
+          }}
+        >
+          <Typography variant="h4" gutterBottom align="center" sx={{ mb: 2 }}>
+            Welcome to Pen & Paper Project
+          </Typography>
+          
+          <Typography variant="body1" paragraph align="center">
+            No campaign assets found. Please upload a zip file containing your campaign assets to get started.
+          </Typography>
+          
+          <Typography variant="body2" paragraph align="center" color="text.secondary" sx={{ mb: 3 }}>
+            Your zip file should contain an "audio" folder for sound files, an "images" folder for location images, 
+            and a "data" folder with your "locations.json" and "characters.json" files.
+          </Typography>
+          
+          <AssetDropZone onAssetImport={handleAssetImport} isFullPage={true} />
+        </Paper>
+      </Box>
+    );
+  }
+
+  // Normal render with locations
   return (
     <Box sx={{ height: 'calc(100vh - 64px)', position: 'relative', overflow: 'hidden' }}>
       {/* Background Image with Zoom and Pan */}
@@ -365,17 +504,60 @@ export const MapView: React.FC = () => {
                     }
                   }}
                 >
-                  <img
-                    src={`/images/${selectedLocation.id}.jpg`}
-                    alt={selectedLocation.name}
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'contain',
-                      position: 'relative',
-                      zIndex: 1,
-                    }}
-                  />
+                  {/* Background image with loading state and fallback */}
+                  {isImageLoading ? (
+                    <Box 
+                      sx={{ 
+                        width: '100%', 
+                        height: '100%', 
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center', 
+                        justifyContent: 'center',
+                        backgroundColor: 'rgba(0, 0, 0, 0.2)'
+                      }}
+                    >
+                      <CircularProgress size={60} />
+                      <Typography variant="body1" sx={{ mt: 2 }}>
+                        Loading image...
+                      </Typography>
+                    </Box>
+                  ) : !imageUrl ? (
+                    <Box 
+                      sx={{ 
+                        width: '100%', 
+                        height: '100%', 
+                        display: 'flex', 
+                        flexDirection: 'column',
+                        alignItems: 'center', 
+                        justifyContent: 'center',
+                        color: 'text.secondary',
+                        backgroundColor: 'rgba(0, 0, 0, 0.2)'
+                      }}
+                    >
+                      <ImageNotSupportedIcon sx={{ fontSize: 64, mb: 2 }} />
+                      <Typography variant="h6" align="center">
+                        No image available for {selectedLocation.name}
+                      </Typography>
+                      <Typography variant="body2" align="center" sx={{ mt: 1, maxWidth: '80%' }}>
+                        To add an image, include "{selectedLocation.id}.jpg" in the images folder of your assets zip file.
+                      </Typography>
+                    </Box>
+                  ) : (
+                    <img
+                      src={imageUrl}
+                      alt={selectedLocation.name}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'contain',
+                        position: 'relative',
+                        zIndex: 1,
+                      }}
+                      onLoad={() => setIsImageLoading(false)}
+                      onError={() => setIsImageLoading(false)}
+                    />
+                  )}
                   {renderLocationMarkers()}
                   {getDirectionalArrows()}
                 </Box>
@@ -398,40 +580,11 @@ export const MapView: React.FC = () => {
                   width: 150,
                 }}
               >
-                {/* Volume Slider */}
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
-                  <IconButton 
-                    onClick={() => {
-                      const { isPlaying } = useStore.getState();
-                      if (isPlaying) {
-                        stopTrack();
-                      } else if (selectedLocation?.backgroundMusic) {
-                        playTrack(`/audio/${selectedLocation.backgroundMusic}`);
-                      }
-                    }} 
-                    size="small"
-                    sx={{ padding: 0 }}
-                  >
-                    {useStore((state) => state.isPlaying) ? (
-                      <VolumeUpIcon fontSize="small" />
-                    ) : (
-                      <VolumeOffIcon fontSize="small" />
-                    )}
-                  </IconButton>
-                  <Slider
-                    value={useStore((state) => state.volume)}
-                    min={0}
-                    max={1}
-                    step={0.1}
-                    onChange={(_, value) => useStore.getState().setVolume(value as number)}
-                    sx={{
-                      color: 'white',
-                      '& .MuiSlider-thumb': {
-                        width: 12,
-                        height: 12,
-                      },
-                    }}
-                  />
+                {/* Map Navigation instead of Volume Slider */}
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, width: '100%' }}>
+                  <Typography variant="caption" sx={{ color: 'white' }}>
+                    Map Navigation
+                  </Typography>
                 </Box>
                 
                 {/* Existing zoom buttons */}
@@ -444,6 +597,16 @@ export const MapView: React.FC = () => {
                 <IconButton onClick={() => resetTransform()} size="small">
                   <RestartAltIcon />
                 </IconButton>
+                
+                {/* Asset Manager Toggle Button */}
+                <Button 
+                  variant="outlined" 
+                  size="small" 
+                  sx={{ mt: 1, width: '100%' }}
+                  onClick={() => setShowAssetManager(!showAssetManager)}
+                >
+                  {showAssetManager ? 'Hide Assets' : 'Manage Assets'}
+                </Button>
               </Paper>
             </>
           )}
@@ -468,13 +631,39 @@ export const MapView: React.FC = () => {
         <Typography variant="h6" gutterBottom>
           Campaign Locations
         </Typography>
-        <Typography variant="body2" sx={{ mb: 2 }}>
-          Click on locations to change the background.
-        </Typography>
         
-        <List sx={{ width: '100%', bgcolor: 'transparent' }} component="nav">
-          {getAllTopLevelLocations().map((location) => renderLocationItem(location))}
-        </List>
+        {getAllTopLevelLocations().length > 0 ? (
+          <>
+            <Typography variant="body2" sx={{ mb: 2 }}>
+              Click on locations to change the background.
+            </Typography>
+            
+            <Box 
+              sx={{
+                flex: 1,
+                overflowY: 'auto',
+              }}
+            >
+              <List sx={{ width: '100%', bgcolor: 'transparent' }} component="nav">
+                {getAllTopLevelLocations().map((location) => renderLocationItem(location))}
+              </List>
+            </Box>
+          </>
+        ) : (
+          <Typography variant="body2" color="error.main">
+            No locations found. Please check your imported data.
+          </Typography>
+        )}
+        
+        {/* Asset management button in the locations panel for easy access */}
+        <Button 
+          variant="outlined" 
+          fullWidth
+          sx={{ mt: 2 }}
+          onClick={() => setShowAssetManager(!showAssetManager)}
+        >
+          {showAssetManager ? 'Hide Asset Manager' : 'Manage Assets'}
+        </Button>
       </Paper>
 
       {/* Details Panel - Non-modal */}
@@ -512,6 +701,31 @@ export const MapView: React.FC = () => {
           )}
         </Paper>
       )}
+
+      {/* Asset Manager Dialog */}
+      <Dialog
+        open={showAssetManager}
+        onClose={() => setShowAssetManager(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            Asset Manager
+            <IconButton 
+              edge="end" 
+              onClick={() => setShowAssetManager(false)}
+            >
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        <DialogContent dividers>
+          <AssetDropZone onAssetImport={handleAssetImport} />
+        </DialogContent>
+      </Dialog>
+
+      <AudioTrackPanel />
     </Box>
   );
 }; 

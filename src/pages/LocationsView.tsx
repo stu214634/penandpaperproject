@@ -1,5 +1,5 @@
 import React from 'react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
   Grid,
@@ -20,41 +20,109 @@ import {
   Divider,
   IconButton,
   Collapse,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemSecondaryAction,
+  CardActions,
+  FormControlLabel,
+  Switch,
+  Paper,
+  Alert,
+  Tooltip,
+  InputAdornment,
+  Snackbar
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import SaveIcon from '@mui/icons-material/Save';
+import MusicNoteIcon from '@mui/icons-material/MusicNote';
+import VolumeUpIcon from '@mui/icons-material/VolumeUp';
+import HelpIcon from '@mui/icons-material/Help';
 import { useStore } from '../store';
+import { AssetManager } from '../services/assetManager';
 
 export const LocationsView: React.FC = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
   const [newLocation, setNewLocation] = useState({
     name: '',
     description: '',
     backgroundMusic: '',
+    entrySound: '',
     parentLocationId: '',
     coordinates: [0, 0] as [number, number],
+    mixWithParent: false,
   });
+  
+  // Currently edited location
+  const [editingLocation, setEditingLocation] = useState<string | null>(null);
+  
+  // Available audio files
+  const [audioFiles, setAudioFiles] = useState<string[]>([]);
+  
+  // Status for save operation
+  const [isSaving, setIsSaving] = useState(false);
+  
+  // Expanded locations state
   const [expandedLocations, setExpandedLocations] = useState<Record<string, boolean>>({});
 
-  const { locations, addLocation, getAllTopLevelLocations, getSublocationsByParentId } = useStore();
+  const { 
+    locations, 
+    addLocation, 
+    updateLocation,
+    deleteLocation, 
+    getAllTopLevelLocations, 
+    getSublocationsByParentId, 
+    saveDataToIndexedDB 
+  } = useStore();
   
   const topLevelLocations = getAllTopLevelLocations();
+
+  // Load audio files on component mount
+  useEffect(() => {
+    const loadAudioFiles = async () => {
+      try {
+        const assets = await AssetManager.getAssets('audio');
+        setAudioFiles(assets.map(asset => asset.name));
+      } catch (error) {
+        console.error('Error loading audio files:', error);
+      }
+    };
+    
+    loadAudioFiles();
+  }, []);
 
   const handleAddLocation = () => {
     addLocation({
       name: newLocation.name,
-        description: newLocation.description,
-        backgroundMusic: newLocation.backgroundMusic || undefined,
-        coordinates: newLocation.coordinates.every(coord => coord !== 0) ? newLocation.coordinates : undefined,
+      description: newLocation.description,
+      backgroundMusic: newLocation.backgroundMusic || undefined,
+      entrySound: newLocation.entrySound || undefined,
+      coordinates: newLocation.coordinates.every(coord => coord !== 0) ? newLocation.coordinates : undefined,
+      parentLocationId: newLocation.parentLocationId || undefined,
+      mixWithParent: newLocation.mixWithParent,
     });
+    
     setIsAddDialogOpen(false);
+    resetNewLocationForm();
+    showSnackbar('Location added successfully');
+  };
+  
+  const resetNewLocationForm = () => {
     setNewLocation({ 
       name: '', 
       description: '', 
       backgroundMusic: '', 
+      entrySound: '',
       parentLocationId: '',
-      coordinates: [0, 0]
+      coordinates: [0, 0],
+      mixWithParent: false
     });
   };
 
@@ -64,171 +132,522 @@ export const LocationsView: React.FC = () => {
       [locationId]: !prev[locationId]
     }));
   };
-
-  const renderLocationCard = (location: any, isSubLocation = false) => {
+  
+  // Open edit dialog for a location
+  const handleEditLocation = (locationId: string) => {
+    const location = locations.find(loc => loc.id === locationId);
+    if (location) {
+      setEditingLocation(locationId);
+      setNewLocation({
+        name: location.name,
+        description: location.description,
+        backgroundMusic: location.backgroundMusic || '',
+        entrySound: location.entrySound || '',
+        parentLocationId: location.parentLocationId || '',
+        coordinates: location.coordinates || [0, 0],
+        mixWithParent: location.mixWithParent || false,
+      });
+      setIsEditDialogOpen(true);
+    }
+  };
+  
+  // Save edited location
+  const handleSaveLocation = () => {
+    if (editingLocation) {
+      updateLocation(editingLocation, {
+        name: newLocation.name,
+        description: newLocation.description,
+        backgroundMusic: newLocation.backgroundMusic || undefined,
+        entrySound: newLocation.entrySound || undefined,
+        coordinates: newLocation.coordinates.every(coord => coord !== 0) ? newLocation.coordinates : undefined,
+        parentLocationId: newLocation.parentLocationId || undefined,
+        mixWithParent: newLocation.mixWithParent,
+      });
+      
+      setIsEditDialogOpen(false);
+      resetNewLocationForm();
+      setEditingLocation(null);
+      showSnackbar('Location updated successfully');
+    }
+  };
+  
+  // Confirm and delete a location
+  const handleDeleteLocation = (locationId: string) => {
+    if (window.confirm('Are you sure you want to delete this location? This cannot be undone.')) {
+      deleteLocation(locationId);
+      showSnackbar('Location deleted successfully');
+    }
+  };
+  
+  // Save all data to IndexedDB
+  const handleSaveData = async () => {
+    setIsSaving(true);
+    try {
+      const result = await saveDataToIndexedDB();
+      showSnackbar(result.message);
+    } catch (error) {
+      showSnackbar(`Error saving data: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  
+  // Show a snackbar message
+  const showSnackbar = (message: string) => {
+    setSnackbarMessage(message);
+    setSnackbarOpen(true);
+  };
+  
+  // Close snackbar
+  const handleCloseSnackbar = () => {
+    setSnackbarOpen(false);
+  };
+  
+  // Recursive function to render all locations with nested structure
+  const renderLocation = (location: any, level = 0) => {
+    const isExpanded = expandedLocations[location.id] || false;
     const sublocations = getSublocationsByParentId(location.id);
     const hasSublocations = sublocations.length > 0;
-    const isExpanded = expandedLocations[location.id] || false;
-
+    
     return (
-      <Grid item xs={12} sm={6} md={4} key={location.id}>
-        <Card sx={{ 
-          position: 'relative',
-          borderLeft: isSubLocation ? '4px solid #4caf50' : 'none'
-        }}>
+      <Box key={location.id} sx={{ mb: 2 }}>
+        <Card>
           <CardContent>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Typography variant="h6" gutterBottom>
-                {location.name}
-              </Typography>
-              {isSubLocation && (
-                <Chip 
-                  label="Sublocation" 
-                  size="small" 
-                  color="success" 
-                  sx={{ mb: 1 }} 
-                />
-              )}
-              {hasSublocations && (
-                <IconButton 
-                  size="small" 
-                  onClick={() => toggleLocationExpand(location.id)}
-                  sx={{ ml: 'auto' }}
-                >
-                  {isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                </IconButton>
-              )}
-            </Box>
-            <Typography variant="body2" color="text.secondary">
-              {location.description}
-            </Typography>
-            {location.backgroundMusic && (
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                Background Music: {location.backgroundMusic}
-              </Typography>
-            )}
-            {location.coordinates && (
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                Coordinates: {location.coordinates[0]}, {location.coordinates[1]}
-              </Typography>
-            )}
-            
-            {hasSublocations && (
-              <Collapse in={isExpanded}>
-                <Divider sx={{ my: 2 }} />
-                <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                  Sublocations:
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <Box>
+                <Typography variant="h6" component="div">
+                  {location.name}
                 </Typography>
-                <Grid container spacing={2}>
-                  {sublocations.map(subloc => renderLocationCard(subloc, true))}
-                </Grid>
-              </Collapse>
-            )}
+                
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                  {location.description}
+                </Typography>
+                
+                <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                  {location.backgroundMusic && (
+                    <Chip 
+                      icon={<MusicNoteIcon />} 
+                      label={`Music: ${location.backgroundMusic}`} 
+                      size="small" 
+                      variant="outlined" 
+                    />
+                  )}
+                  
+                  {location.entrySound && (
+                    <Chip 
+                      icon={<VolumeUpIcon />} 
+                      label={`Sound: ${location.entrySound}`} 
+                      size="small" 
+                      variant="outlined" 
+                    />
+                  )}
+                  
+                  {location.coordinates && (
+                    <Chip 
+                      label={`Coords: ${location.coordinates[0]}, ${location.coordinates[1]}`} 
+                      size="small" 
+                      variant="outlined" 
+                    />
+                  )}
+                  
+                  {location.mixWithParent && (
+                    <Chip 
+                      label="Mixes with parent" 
+                      size="small" 
+                      color="primary" 
+                      variant="outlined" 
+                    />
+                  )}
+                </Box>
+              </Box>
+              
+              <Box>
+                <IconButton onClick={() => handleEditLocation(location.id)}>
+                  <EditIcon />
+                </IconButton>
+                <IconButton onClick={() => handleDeleteLocation(location.id)}>
+                  <DeleteIcon />
+                </IconButton>
+                {hasSublocations && (
+                  <IconButton onClick={() => toggleLocationExpand(location.id)}>
+                    {isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                  </IconButton>
+                )}
+              </Box>
+            </Box>
           </CardContent>
+          
+          <CardActions sx={{ justifyContent: 'flex-end', pt: 0 }}>
+            <Button 
+              size="small" 
+              startIcon={<AddIcon />}
+              onClick={() => {
+                setNewLocation({
+                  ...newLocation,
+                  parentLocationId: location.id
+                });
+                setIsAddDialogOpen(true);
+              }}
+            >
+              Add Sublocation
+            </Button>
+          </CardActions>
         </Card>
-      </Grid>
+        
+        {/* Sublocations */}
+        {hasSublocations && isExpanded && (
+          <Box sx={{ pl: 4, mt: 1 }}>
+            {sublocations.map(subloc => renderLocation(subloc, level + 1))}
+          </Box>
+        )}
+      </Box>
     );
   };
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+    <Box sx={{ p: 3, maxWidth: 1200, mx: 'auto' }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h4">Locations</Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => setIsAddDialogOpen(true)}
-        >
-          Add Location
-        </Button>
+        <Box>
+          <Button 
+            variant="outlined" 
+            color="success" 
+            startIcon={<SaveIcon />} 
+            onClick={handleSaveData}
+            disabled={isSaving}
+            sx={{ mr: 2 }}
+          >
+            {isSaving ? 'Saving...' : 'Save Changes'}
+          </Button>
+          
+          <Button 
+            variant="contained" 
+            startIcon={<AddIcon />} 
+            onClick={() => {
+              resetNewLocationForm();
+              setIsAddDialogOpen(true);
+            }}
+          >
+            Add Location
+          </Button>
+        </Box>
       </Box>
-
-      <Grid container spacing={3}>
-        {topLevelLocations.map((location) => renderLocationCard(location))}
-      </Grid>
-
-      <Dialog open={isAddDialogOpen} onClose={() => setIsAddDialogOpen(false)} maxWidth="sm" fullWidth>
+      
+      {locations.length === 0 ? (
+        <Paper sx={{ p: 3, textAlign: 'center' }}>
+          <Typography variant="h6" color="text.secondary" gutterBottom>
+            No Locations Yet
+          </Typography>
+          <Typography variant="body1" color="text.secondary" paragraph>
+            Add your first location to get started.
+          </Typography>
+          <Button 
+            variant="contained" 
+            startIcon={<AddIcon />} 
+            onClick={() => setIsAddDialogOpen(true)}
+          >
+            Add Location
+          </Button>
+        </Paper>
+      ) : (
+        // Locations list
+        <Box>
+          {topLevelLocations.map(location => renderLocation(location))}
+        </Box>
+      )}
+      
+      {/* Add Location Dialog */}
+      <Dialog open={isAddDialogOpen} onClose={() => setIsAddDialogOpen(false)} maxWidth="md" fullWidth>
         <DialogTitle>Add New Location</DialogTitle>
         <DialogContent>
-          <TextField
-            autoFocus
-            margin="dense"
-            label="Name"
-            fullWidth
-            value={newLocation.name}
-            onChange={(e) => setNewLocation({ ...newLocation, name: e.target.value })}
-          />
-          <TextField
-            margin="dense"
-            label="Description"
-            fullWidth
-            multiline
-            rows={4}
-            value={newLocation.description}
-            onChange={(e) => setNewLocation({ ...newLocation, description: e.target.value })}
-          />
-          <TextField
-            margin="dense"
-            label="Background Music URL (optional)"
-            fullWidth
-            value={newLocation.backgroundMusic}
-            onChange={(e) => setNewLocation({ ...newLocation, backgroundMusic: e.target.value })}
-          />
-          
-          <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
-            <TextField
-              margin="dense"
-              label="Latitude (optional)"
-              type="number"
-              value={newLocation.coordinates[0] || ''}
-              onChange={(e) => setNewLocation({ 
-                ...newLocation, 
-                coordinates: [parseFloat(e.target.value) || 0, newLocation.coordinates[1]] 
-              })}
-              sx={{ flex: 1 }}
-            />
-            <TextField
-              margin="dense"
-              label="Longitude (optional)"
-              type="number"
-              value={newLocation.coordinates[1] || ''}
-              onChange={(e) => setNewLocation({ 
-                ...newLocation, 
-                coordinates: [newLocation.coordinates[0], parseFloat(e.target.value) || 0] 
-              })}
-              sx={{ flex: 1 }}
-            />
-          </Box>
-          
-          <FormControl fullWidth margin="dense">
-            <InputLabel>Parent Location (optional)</InputLabel>
-            <Select
-              value={newLocation.parentLocationId}
-              label="Parent Location (optional)"
-              onChange={(e) => setNewLocation({ ...newLocation, parentLocationId: e.target.value as string })}
-            >
-              <MenuItem value="">
-                <em>None (Top-level location)</em>
-              </MenuItem>
-              {locations.map((location) => (
-                <MenuItem key={location.id} value={location.id}>
-                  {location.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <Grid container spacing={2} sx={{ mt: 0.5 }}>
+            <Grid item xs={12} md={6}>
+              <TextField
+                label="Name"
+                fullWidth
+                value={newLocation.name}
+                onChange={(e) => setNewLocation({ ...newLocation, name: e.target.value })}
+              />
+            </Grid>
+            
+            <Grid item xs={12} md={6}>
+              <FormControl fullWidth>
+                <InputLabel>Parent Location</InputLabel>
+                <Select
+                  value={newLocation.parentLocationId}
+                  label="Parent Location"
+                  onChange={(e) => setNewLocation({ ...newLocation, parentLocationId: e.target.value as string })}
+                >
+                  <MenuItem value="">
+                    <em>None (Top-level)</em>
+                  </MenuItem>
+                  {locations.map((loc) => (
+                    <MenuItem key={loc.id} value={loc.id}>{loc.name}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            
+            <Grid item xs={12}>
+              <TextField
+                label="Description"
+                fullWidth
+                multiline
+                rows={3}
+                value={newLocation.description}
+                onChange={(e) => setNewLocation({ ...newLocation, description: e.target.value })}
+              />
+            </Grid>
+            
+            <Grid item xs={12} md={6}>
+              <FormControl fullWidth>
+                <InputLabel>Background Music</InputLabel>
+                <Select
+                  value={newLocation.backgroundMusic}
+                  label="Background Music"
+                  onChange={(e) => setNewLocation({ ...newLocation, backgroundMusic: e.target.value as string })}
+                >
+                  <MenuItem value="">
+                    <em>None</em>
+                  </MenuItem>
+                  {audioFiles.map((file) => (
+                    <MenuItem key={file} value={file}>{file}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            
+            <Grid item xs={12} md={6}>
+              <FormControl fullWidth>
+                <InputLabel>Entry Sound</InputLabel>
+                <Select
+                  value={newLocation.entrySound}
+                  label="Entry Sound"
+                  onChange={(e) => setNewLocation({ ...newLocation, entrySound: e.target.value as string })}
+                >
+                  <MenuItem value="">
+                    <em>None</em>
+                  </MenuItem>
+                  {audioFiles.map((file) => (
+                    <MenuItem key={file} value={file}>{file}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            
+            <Grid item xs={12} md={6}>
+              <TextField
+                label="X Coordinate"
+                type="number"
+                fullWidth
+                value={newLocation.coordinates[0]}
+                onChange={(e) => setNewLocation({ 
+                  ...newLocation, 
+                  coordinates: [parseInt(e.target.value) || 0, newLocation.coordinates[1]] 
+                })}
+                InputProps={{
+                  startAdornment: <InputAdornment position="start">X:</InputAdornment>,
+                }}
+              />
+            </Grid>
+            
+            <Grid item xs={12} md={6}>
+              <TextField
+                label="Y Coordinate"
+                type="number"
+                fullWidth
+                value={newLocation.coordinates[1]}
+                onChange={(e) => setNewLocation({ 
+                  ...newLocation, 
+                  coordinates: [newLocation.coordinates[0], parseInt(e.target.value) || 0] 
+                })}
+                InputProps={{
+                  startAdornment: <InputAdornment position="start">Y:</InputAdornment>,
+                }}
+              />
+            </Grid>
+            
+            <Grid item xs={12}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={newLocation.mixWithParent}
+                    onChange={(e) => setNewLocation({ ...newLocation, mixWithParent: e.target.checked })}
+                  />
+                }
+                label="Mix audio with parent location"
+              />
+              <Tooltip title="When enabled, entering this location will play its audio alongside the parent location's audio.">
+                <IconButton size="small">
+                  <HelpIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </Grid>
+          </Grid>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
           <Button 
             onClick={handleAddLocation} 
             variant="contained"
-            disabled={!newLocation.name || !newLocation.description}
+            disabled={!newLocation.name}
           >
-            Add
+            Add Location
           </Button>
         </DialogActions>
       </Dialog>
+      
+      {/* Edit Location Dialog */}
+      <Dialog open={isEditDialogOpen} onClose={() => setIsEditDialogOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>Edit Location</DialogTitle>
+        <DialogContent>
+          <Grid container spacing={2} sx={{ mt: 0.5 }}>
+            <Grid item xs={12} md={6}>
+              <TextField
+                label="Name"
+                fullWidth
+                value={newLocation.name}
+                onChange={(e) => setNewLocation({ ...newLocation, name: e.target.value })}
+              />
+            </Grid>
+            
+            <Grid item xs={12} md={6}>
+              <FormControl fullWidth>
+                <InputLabel>Parent Location</InputLabel>
+                <Select
+                  value={newLocation.parentLocationId}
+                  label="Parent Location"
+                  onChange={(e) => setNewLocation({ ...newLocation, parentLocationId: e.target.value as string })}
+                >
+                  <MenuItem value="">
+                    <em>None (Top-level)</em>
+                  </MenuItem>
+                  {locations
+                    .filter(loc => loc.id !== editingLocation) // Prevent selecting itself
+                    .map((loc) => (
+                      <MenuItem key={loc.id} value={loc.id}>{loc.name}</MenuItem>
+                    ))
+                  }
+                </Select>
+              </FormControl>
+            </Grid>
+            
+            <Grid item xs={12}>
+              <TextField
+                label="Description"
+                fullWidth
+                multiline
+                rows={3}
+                value={newLocation.description}
+                onChange={(e) => setNewLocation({ ...newLocation, description: e.target.value })}
+              />
+            </Grid>
+            
+            <Grid item xs={12} md={6}>
+              <FormControl fullWidth>
+                <InputLabel>Background Music</InputLabel>
+                <Select
+                  value={newLocation.backgroundMusic}
+                  label="Background Music"
+                  onChange={(e) => setNewLocation({ ...newLocation, backgroundMusic: e.target.value as string })}
+                >
+                  <MenuItem value="">
+                    <em>None</em>
+                  </MenuItem>
+                  {audioFiles.map((file) => (
+                    <MenuItem key={file} value={file}>{file}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            
+            <Grid item xs={12} md={6}>
+              <FormControl fullWidth>
+                <InputLabel>Entry Sound</InputLabel>
+                <Select
+                  value={newLocation.entrySound}
+                  label="Entry Sound"
+                  onChange={(e) => setNewLocation({ ...newLocation, entrySound: e.target.value as string })}
+                >
+                  <MenuItem value="">
+                    <em>None</em>
+                  </MenuItem>
+                  {audioFiles.map((file) => (
+                    <MenuItem key={file} value={file}>{file}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            
+            <Grid item xs={12} md={6}>
+              <TextField
+                label="X Coordinate"
+                type="number"
+                fullWidth
+                value={newLocation.coordinates[0]}
+                onChange={(e) => setNewLocation({ 
+                  ...newLocation, 
+                  coordinates: [parseInt(e.target.value) || 0, newLocation.coordinates[1]] 
+                })}
+                InputProps={{
+                  startAdornment: <InputAdornment position="start">X:</InputAdornment>,
+                }}
+              />
+            </Grid>
+            
+            <Grid item xs={12} md={6}>
+              <TextField
+                label="Y Coordinate"
+                type="number"
+                fullWidth
+                value={newLocation.coordinates[1]}
+                onChange={(e) => setNewLocation({ 
+                  ...newLocation, 
+                  coordinates: [newLocation.coordinates[0], parseInt(e.target.value) || 0] 
+                })}
+                InputProps={{
+                  startAdornment: <InputAdornment position="start">Y:</InputAdornment>,
+                }}
+              />
+            </Grid>
+            
+            <Grid item xs={12}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={newLocation.mixWithParent}
+                    onChange={(e) => setNewLocation({ ...newLocation, mixWithParent: e.target.checked })}
+                  />
+                }
+                label="Mix audio with parent location"
+              />
+              <Tooltip title="When enabled, entering this location will play its audio alongside the parent location's audio.">
+                <IconButton size="small">
+                  <HelpIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
+          <Button 
+            onClick={handleSaveLocation} 
+            variant="contained"
+            disabled={!newLocation.name}
+          >
+            Save Changes
+          </Button>
+        </DialogActions>
+      </Dialog>
+      
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        message={snackbarMessage}
+      />
     </Box>
   );
 }; 
