@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Typography, Paper, Slider, IconButton, List, ListItem, Divider, Collapse } from '@mui/material';
-import { VolumeOff, VolumeUp, Close, ExpandMore, ExpandLess } from '@mui/icons-material';
+import { VolumeOff, VolumeUp, Close, ExpandMore, ExpandLess, Loop, DoNotDisturb } from '@mui/icons-material';
 import { useStore } from '../store';
+import { AudioTrackSelector } from './AudioTrackSelector';
 
 export const AudioTrackPanel: React.FC = () => {
   const activeTracks = useStore((state) => state.activeTracks);
@@ -20,8 +21,6 @@ export const AudioTrackPanel: React.FC = () => {
       setPreviousVolume(volume);
     }
   }, [volume, isMasterMuted]);
-
-  if (activeTracks.length === 0) return null;
 
   const handleMasterMute = () => {
     if (isMasterMuted) {
@@ -82,6 +81,9 @@ export const AudioTrackPanel: React.FC = () => {
         Audio Controls
       </Typography>
       
+      {/* Track Selector Button */}
+      <AudioTrackSelector />
+      
       {/* Master Volume Control */}
       <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
         <IconButton onClick={handleMasterMute} size="small">
@@ -109,53 +111,68 @@ export const AudioTrackPanel: React.FC = () => {
         Active Tracks
       </Typography>
       
-      <List dense>
-        {activeTracks.map((track) => (
-          <React.Fragment key={track.id}>
-            <ListItem sx={{ gap: 1, px: 0 }}>
-              <IconButton onClick={() => toggleMuteTrack(track.id)} size="small">
-                {track.isMuted ? <VolumeOff fontSize="small" /> : <VolumeUp fontSize="small" />}
-              </IconButton>
-              
-              <Typography 
-                variant="body2" 
-                sx={{ flex: 1, cursor: 'pointer' }}
-                onClick={() => toggleTrackExpand(track.id)}
-              >
-                {track.name}
-              </Typography>
-              
-              <IconButton 
-                size="small" 
-                onClick={() => toggleTrackExpand(track.id)}
-              >
-                {expandedTracks[track.id] ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
-              </IconButton>
-
-              <IconButton onClick={() => stopIndividualTrack(track.id)} size="small">
-                <Close fontSize="small" />
-              </IconButton>
-            </ListItem>
-            
-            <Collapse in={expandedTracks[track.id]} timeout="auto" unmountOnExit>
-              <Box sx={{ pl: 4, pr: 2, pb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Typography variant="caption" sx={{ minWidth: 60 }}>
-                  Volume
+      {activeTracks.length === 0 ? (
+        <Typography variant="body2" sx={{ color: 'text.secondary', fontStyle: 'italic' }}>
+          No tracks currently playing. Use the "Add Track" button to play some music.
+        </Typography>
+      ) : (
+        <List dense>
+          {activeTracks.map((track) => (
+            <React.Fragment key={track.id}>
+              <ListItem sx={{ gap: 1, px: 0 }}>
+                <IconButton onClick={() => toggleMuteTrack(track.id)} size="small">
+                  {track.isMuted ? <VolumeOff fontSize="small" /> : <VolumeUp fontSize="small" />}
+                </IconButton>
+                
+                <Typography 
+                  variant="body2" 
+                  sx={{ flex: 1, cursor: 'pointer' }}
+                  onClick={() => toggleTrackExpand(track.id)}
+                >
+                  {track.name}
                 </Typography>
-                <Slider
-                  size="small"
-                  value={track.volume}
-                  onChange={handleTrackVolumeChange(track.id)}
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  sx={{ ml: 1 }}
-                />
-              </Box>
-            </Collapse>
-          </React.Fragment>
-        ))}
-      </List>
+                
+                {/* Loop indicator */}
+                <IconButton 
+                  size="small" 
+                  disabled 
+                  sx={{ opacity: track.loop ? 1 : 0.3 }}
+                >
+                  {track.loop ? <Loop fontSize="small" /> : <DoNotDisturb fontSize="small" />}
+                </IconButton>
+                
+                <IconButton 
+                  size="small" 
+                  onClick={() => toggleTrackExpand(track.id)}
+                >
+                  {expandedTracks[track.id] ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
+                </IconButton>
+
+                <IconButton onClick={() => stopIndividualTrack(track.id)} size="small">
+                  <Close fontSize="small" />
+                </IconButton>
+              </ListItem>
+              
+              <Collapse in={expandedTracks[track.id]} timeout="auto" unmountOnExit>
+                <Box sx={{ pl: 4, pr: 2, pb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography variant="caption" sx={{ minWidth: 60 }}>
+                    Volume
+                  </Typography>
+                  <Slider
+                    size="small"
+                    value={track.volume}
+                    onChange={handleTrackVolumeChange(track.id)}
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    sx={{ ml: 1 }}
+                  />
+                </Box>
+              </Collapse>
+            </React.Fragment>
+          ))}
+        </List>
+      )}
     </Paper>
   );
-}; 
+};

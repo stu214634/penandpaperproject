@@ -61,6 +61,7 @@ interface ActiveTrack {
   volume: number;
   isMuted: boolean;
   locationId: string;
+  loop: boolean;
 }
 
 interface StoreState {
@@ -86,7 +87,7 @@ interface StoreState {
   deleteCharacter: (characterId: string) => void;
   addAudioTrack: (track: Omit<AudioTrack, 'id'>) => void;
   setCurrentLocation: (locationId: string) => void;
-  playTrack: (url: string, options?: { replace?: boolean, locationId?: string }) => void;
+  playTrack: (url: string, options?: { replace?: boolean, locationId?: string, loop?: boolean }) => void;
   stopTrack: () => void;
   getSublocationsByParentId: (parentLocationId: string) => CustomLocation[];
   getAllTopLevelLocations: () => CustomLocation[];
@@ -263,10 +264,11 @@ export const useStore = create<StoreState>((set, get) => {
       }));
     },
 
-    playTrack: async (url: string, options?: { replace?: boolean, locationId?: string }) => {
+    playTrack: async (url: string, options?: { replace?: boolean, locationId?: string, loop?: boolean }) => {
       const { currentHowl, volume, activeTracks, locations } = get();
       const replace = options?.replace ?? true;
       const locationId = options?.locationId || '';
+      const loop = options?.loop ?? true; // Default to loop=true for backward compatibility
 
       // Extract just the filename without the path
       const trackName = url.split('/').pop() || 'Unknown track';
@@ -280,19 +282,21 @@ export const useStore = create<StoreState>((set, get) => {
         return;
       }
 
-      // Prevent duplicates
-      if (activeTracks.some(t => t.locationId === locationId)) {
-        console.log('Track for this location already playing, skipping');
+      // Check if this exact track is already playing
+      const isDuplicate = activeTracks.some(t => t.name === trackName || t.id === url);
+      if (isDuplicate) {
+        console.log('This track is already playing, skipping', trackName);
         return;
       }
 
-      // Find the current location to understand parent-child relationships
-      const currentLocation = locations.find(loc => loc.id === locationId);
-      const isSubLocation = !!currentLocation?.parentLocationId;
-      
+      // Handle location-based track replacements
       // For mixWithParent (replace=false) situations:
-      if (!replace) {
+      if (!replace && locationId) {
         console.log("Keeping parent track, this is a mixed sublocation");
+        
+        // Find the current location to understand parent-child relationships
+        const currentLocation = locations.find(loc => loc.id === locationId);
+        const isSubLocation = !!currentLocation?.parentLocationId;
         
         // We want to keep the parent track but stop any other sublocation tracks
         // Find the parent location ID for filtering
@@ -328,7 +332,7 @@ export const useStore = create<StoreState>((set, get) => {
         });
       }
       // For main location changes (replace=true)
-      else {
+      else if (replace){
         console.log("Replacing all tracks, this is a main location change");
         // Stop all existing tracks
         activeTracks.forEach(track => {
@@ -346,35 +350,46 @@ export const useStore = create<StoreState>((set, get) => {
         }
       }
 
-      // Create new track with the asset URL
+      // Create new track with the asset URL - WITHOUT onplay/onend handlers!
       const newHowl = new Howl({
         src: [assetUrl],
-        loop: true,
+        loop: loop,
         volume: replace ? 0 : volume, // Start at 0 if replacing for fade-in
-        onplay: () => {
-          set((state) => ({
-            activeTracks: [...state.activeTracks, {
-              id: url, // Keep using the original url as ID for consistency
-              howl: newHowl,
-              name: trackName,
-              volume,
-              isMuted: false,
-              locationId
-            }]
-          }));
-        },
-        onend: () => {
-          set((state) => ({
+      });
+
+      // IMPORTANT: Add track to activeTracks BEFORE playing
+      // This ensures we don't get duplication from event callbacks
+      const newTrack = {
+        id: url,
+        howl: newHowl,
+        name: trackName,
+        volume,
+        isMuted: false,
+        locationId,
+        loop
+      };
+      
+      // Add the track to our active tracks
+      set(state => ({
+        activeTracks: [...state.activeTracks, newTrack]
+      }));
+
+      // For non-looping tracks only: add manual onend handler
+      if (!loop) {
+        newHowl.once('end', () => {
+          console.log('Non-looping track ended, removing from active tracks:', trackName);
+          set(state => ({
             activeTracks: state.activeTracks.filter(t => t.id !== url)
           }));
-        }
-      });
+        });
+      }
 
       // Fade in if replacing (main location)
       if (replace) {
         newHowl.fade(0, volume, 2000);
       }
 
+      // Start playing the track
       newHowl.play();
     },
 
@@ -407,15 +422,26 @@ export const useStore = create<StoreState>((set, get) => {
       }));
     },
 
-    stopIndividualTrack: (trackId) => {
+    stopIndividualTrack: (trackId: string) => {
       set((state) => {
         const track = state.activeTracks.find(t => t.id === trackId);
         if (track) {
-          track.howl.fade(track.volume, 0, 2000);
-          track.howl.once('fade', () => track.howl.stop());
-          return {
-            activeTracks: state.activeTracks.filter(t => t.id !== trackId)
-          };
+          console.log('Stopping track:', track.name);
+          
+          // First remove from the activeTracks array to prevent any race conditions
+          const updatedTracks = state.activeTracks.filter(t => t.id !== trackId);
+          
+          // Then fade out and stop the track
+          track.howl.fade(track.volume, 0, 1000);
+          track.howl.once('fade', () => {
+            // Explicitly stop the track
+            track.howl.stop();
+            
+            // Unload the track to free up resources
+            track.howl.unload();
+          });
+          
+          return { activeTracks: updatedTracks };
         }
         return state;
       });
@@ -450,27 +476,36 @@ export const useStore = create<StoreState>((set, get) => {
         const hasImageAssets = await AssetManager.hasAssets('images');
         const hasDataAssets = await AssetManager.hasAssets('data');
         
+        // Stop and unload all playing tracks before refreshing
+        const { activeTracks, currentHowl } = get();
+        
+        // For each active track, fade out, stop, and unload
+        activeTracks.forEach(track => {
+          track.howl.fade(track.volume, 0, 500);
+          track.howl.once('fade', () => {
+            track.howl.stop();
+            track.howl.unload(); // Make sure to unload to free resources
+          });
+        });
+        
+        // Handle the current howl if it exists
+        if (currentHowl) {
+          currentHowl.fade(currentHowl.volume(), 0, 500);
+          currentHowl.once('fade', () => {
+            currentHowl.stop();
+            currentHowl.unload();
+          });
+        }
+        
+        // Clear the active tracks
         set({
           locations: customLocations,
           characters: customCharacters,
           hasAssets: hasAudioAssets || hasImageAssets || hasDataAssets,
-          isLoading: false
+          isLoading: false,
+          activeTracks: [], // Clear active tracks
+          currentHowl: null // Clear current howl
         });
-        
-        // Stop all playing tracks
-        const { activeTracks, currentHowl } = get();
-        
-        activeTracks.forEach(track => {
-          track.howl.fade(track.volume, 0, 500);
-          track.howl.once('fade', () => track.howl.stop());
-        });
-        
-        if (currentHowl) {
-          currentHowl.fade(currentHowl.volume(), 0, 500);
-          currentHowl.once('fade', () => currentHowl.stop());
-        }
-        
-        set({ activeTracks: [], currentHowl: null });
       } catch (error) {
         console.error('Error refreshing assets:', error);
         set({ isLoading: false });

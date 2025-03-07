@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Grid, Card, CardContent, Typography } from '@mui/material';
 import { useStore } from '../store';
+import { AudioTrackPanel } from '../components/AudioTrackPanel';
 
 export const Dashboard: React.FC = () => {
   const { locations, characters, audioTracks } = useStore();
@@ -65,6 +66,8 @@ export const Dashboard: React.FC = () => {
           </Card>
         </Grid>
       </Grid>
+      
+      <AudioTrackPanel />
     </Box>
   );
 }; 

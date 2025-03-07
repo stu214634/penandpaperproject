@@ -34,6 +34,7 @@ import PersonIcon from '@mui/icons-material/Person';
 import StoreIcon from '@mui/icons-material/Store';
 import InventoryIcon from '@mui/icons-material/Inventory';
 import { useStore } from '../store';
+import { AudioTrackPanel } from '../components/AudioTrackPanel';
 
 export const CharactersView: React.FC = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -382,6 +383,9 @@ export const CharactersView: React.FC = () => {
         onClose={handleCloseSnackbar}
         message={snackbarMessage}
       />
+      
+      {/* Include the AudioTrackPanel */}
+      <AudioTrackPanel />
     </Box>
   );
 }; 

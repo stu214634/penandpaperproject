@@ -44,6 +44,7 @@ import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import HelpIcon from '@mui/icons-material/Help';
 import { useStore } from '../store';
 import { AssetManager } from '../services/assetManager';
+import { AudioTrackPanel } from '../components/AudioTrackPanel';
 
 export const LocationsView: React.FC = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -648,6 +649,9 @@ export const LocationsView: React.FC = () => {
         onClose={handleCloseSnackbar}
         message={snackbarMessage}
       />
+      
+      {/* Include the AudioTrackPanel */}
+      <AudioTrackPanel />
     </Box>
   );
 }; 

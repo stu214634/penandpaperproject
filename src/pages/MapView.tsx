@@ -28,11 +28,6 @@ import { CustomLocation } from '../store';
 import NorthIcon from '@mui/icons-material/North';
 import { Howl } from 'howler';
 import { AudioTrackPanel } from '../components/AudioTrackPanel';
-import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
-import KeyboardArrowLeftIcon from '@mui/icons-material/KeyboardArrowLeft';
-import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
-import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
-import { useNavigate } from 'react-router-dom';
 import { AssetDropZone } from '../components/AssetDropZone';
 import { AssetManager } from '../services/assetManager';
 import ImageNotSupportedIcon from '@mui/icons-material/ImageNotSupported';
@@ -51,7 +46,7 @@ export const MapView: React.FC = () => {
   const [selectedLocation, setSelectedLocation] = useState<CustomLocation | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   // Asset manager panel is shown by default if no assets are available
-  const [showAssetManager, setShowAssetManager] = useState(hasAssets);
+  const [showAssetManager, setShowAssetManager] = useState(false);
   
   // Additional state for image loading
   const [isImageLoading, setIsImageLoading] = useState(false);
@@ -870,6 +865,7 @@ export const MapView: React.FC = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Audio track panel - always show it now, regardless of whether there are tracks playing */}
       <AudioTrackPanel />
     </Box>
   );

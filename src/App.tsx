@@ -5,8 +5,7 @@ import { Navigation } from './components/Navigation';
 import { Dashboard } from './pages/Dashboard';
 import { LocationsView } from './pages/LocationsView';
 import { MapView } from './pages/MapView';
-// Import will be available after recompilation
-// import { CharactersView } from './pages/CharactersView';
+import { CharactersView } from './pages/CharactersView';
 
 function App() {
   return (
@@ -20,8 +19,8 @@ function App() {
               <Route path="/" element={<Dashboard />} />
               <Route path="/map" element={<MapView />} />
               <Route path="/locations" element={<LocationsView />} />
+              <Route path="/characters" element={<CharactersView />} />
               {/* Temporarily comment out until available */}
-              {/* <Route path="/characters" element={<CharactersView />} /> */}
             </Routes>
           </Box>
         </Box>
