@@ -33,6 +33,7 @@ import SaveIcon from '@mui/icons-material/Save';
 import PersonIcon from '@mui/icons-material/Person';
 import StoreIcon from '@mui/icons-material/Store';
 import InventoryIcon from '@mui/icons-material/Inventory';
+import PlaceIcon from '@mui/icons-material/Place';
 import { useStore } from '../store';
 import { AudioTrackPanel } from '../components/AudioTrackPanel';
 
@@ -48,7 +49,8 @@ export const CharactersView: React.FC = () => {
     addCharacter, 
     updateCharacter, 
     deleteCharacter, 
-    saveDataToIndexedDB 
+    saveDataToIndexedDB,
+    locations
   } = useStore();
   
   // New character form data
@@ -56,6 +58,7 @@ export const CharactersView: React.FC = () => {
     name: '',
     description: '',
     type: 'npc' as 'npc' | 'merchant',
+    locationId: ''
   });
   
   // Currently editing character id
@@ -67,6 +70,7 @@ export const CharactersView: React.FC = () => {
       name: newCharacter.name,
       description: newCharacter.description,
       type: newCharacter.type,
+      locationId: newCharacter.locationId
     });
     
     setIsAddDialogOpen(false);
@@ -80,6 +84,7 @@ export const CharactersView: React.FC = () => {
       name: '',
       description: '',
       type: 'npc',
+      locationId: ''
     });
   };
   
@@ -92,6 +97,7 @@ export const CharactersView: React.FC = () => {
         name: character.name,
         description: character.description,
         type: character.type,
+        locationId: character.locationId || ''
       });
       setIsEditDialogOpen(true);
     }
@@ -104,6 +110,7 @@ export const CharactersView: React.FC = () => {
         name: newCharacter.name,
         description: newCharacter.description,
         type: newCharacter.type,
+        locationId: newCharacter.locationId
       });
       
       setIsEditDialogOpen(false);
@@ -147,6 +154,10 @@ export const CharactersView: React.FC = () => {
   
   // Render a character card
   const renderCharacterCard = (character: any) => {
+    const location = character.locationId 
+      ? locations.find(loc => loc.id === character.locationId)
+      : null;
+      
     return (
       <Grid item xs={12} sm={6} md={4} key={character.id}>
         <Card>
@@ -165,6 +176,17 @@ export const CharactersView: React.FC = () => {
                     color={character.type === 'npc' ? 'primary' : 'secondary'}
                     variant="outlined"
                   />
+                  
+                  {location && (
+                    <Chip
+                      icon={<PlaceIcon />}
+                      label={location.name}
+                      size="small"
+                      color="info"
+                      variant="outlined"
+                      sx={{ ml: 1 }}
+                    />
+                  )}
                 </Box>
                 
                 <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
@@ -297,6 +319,26 @@ export const CharactersView: React.FC = () => {
               </FormControl>
             </Grid>
             
+            <Grid item xs={12} md={6}>
+              <FormControl fullWidth>
+                <InputLabel>Location</InputLabel>
+                <Select
+                  value={newCharacter.locationId}
+                  label="Location"
+                  onChange={(e) => setNewCharacter({ 
+                    ...newCharacter, 
+                    locationId: e.target.value as string 
+                  })}
+                  displayEmpty
+                >
+                  <MenuItem value="">No Location</MenuItem>
+                  {locations.map((location) => (
+                    <MenuItem key={location.id} value={location.id}>{location.name}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            
             <Grid item xs={12}>
               <TextField
                 label="Description"
@@ -348,6 +390,26 @@ export const CharactersView: React.FC = () => {
                 >
                   <MenuItem value="npc">NPC</MenuItem>
                   <MenuItem value="merchant">Merchant</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            
+            <Grid item xs={12} md={6}>
+              <FormControl fullWidth>
+                <InputLabel>Location</InputLabel>
+                <Select
+                  value={newCharacter.locationId}
+                  label="Location"
+                  onChange={(e) => setNewCharacter({ 
+                    ...newCharacter, 
+                    locationId: e.target.value as string 
+                  })}
+                  displayEmpty
+                >
+                  <MenuItem value="">No Location</MenuItem>
+                  {locations.map((location) => (
+                    <MenuItem key={location.id} value={location.id}>{location.name}</MenuItem>
+                  ))}
                 </Select>
               </FormControl>
             </Grid>

@@ -27,7 +27,18 @@ import {
   Stack,
   SpeedDial,
   SpeedDialIcon,
-  SpeedDialAction
+  SpeedDialAction,
+  Grid,
+  ListItemSecondaryAction,
+  Divider,
+  Card,
+  CardHeader,
+  CardContent,
+  CardActions,
+  Drawer,
+  Tabs,
+  Tab,
+  Chip
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import AddIcon from '@mui/icons-material/Add';
@@ -52,7 +63,11 @@ import {
   Save as SaveIcon,
   Cancel as CancelIcon,
   Delete as DeleteIcon,
-  MusicNote as MusicNoteIcon
+  MusicNote as MusicNoteIcon,
+  Person as PersonIcon,
+  Store as MerchantIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon
 } from '@mui/icons-material';
 
 export const MapView: React.FC = () => {
@@ -64,6 +79,8 @@ export const MapView: React.FC = () => {
   const refreshAssets = useStore((state) => state.refreshAssets);
   const hasAssets = useStore((state) => state.hasAssets);
   const isLoading = useStore((state) => state.isLoading);
+  const characters = useStore((state) => state.characters);
+  const saveDataToIndexedDB = useStore((state) => state.saveDataToIndexedDB);
   
   // Get only the selected location ID from the store
   const selectedLocationId = useStore((state) => state.selectedLocationId);
@@ -97,6 +114,12 @@ export const MapView: React.FC = () => {
   
   // Background image handling with state
   const [imageUrl, setImageUrl] = useState<string>('');
+  
+  // State for expanded NPC sections
+  const [expandedNpcSections, setExpandedNpcSections] = useState<{[key: string]: boolean}>({});
+  
+  // Additional state for the UI
+  const [detailsTab, setDetailsTab] = useState(0);
   
   // Effect to initialize the selected location from the saved state
   useEffect(() => {
@@ -327,6 +350,12 @@ export const MapView: React.FC = () => {
       setShowEditDialog(false);
       setEditingLocation(null);
     }
+  };
+  
+  // Function to save data
+  const handleSaveData = async () => {
+    const result = await saveDataToIndexedDB();
+    alert(result.message);
   };
   
   // Render location markers on the map
@@ -585,6 +614,129 @@ export const MapView: React.FC = () => {
       });
   };
   
+  // Toggle expanded state for NPC sections
+  const toggleNpcSection = (locationId: string) => {
+    setExpandedNpcSections(prev => ({
+      ...prev,
+      [locationId]: !prev[locationId]
+    }));
+  };
+  
+  // Get characters for a specific location
+  const getCharactersByLocationId = (locationId: string) => {
+    return characters.filter(char => char.locationId === locationId);
+  };
+  
+  // Get all characters in a location and its sublocations
+  const getAllCharactersInLocationHierarchy = (locationId: string) => {
+    const directCharacters = getCharactersByLocationId(locationId);
+    const sublocations = getSublocationsByParentId(locationId);
+    
+    let allCharacters = [...directCharacters];
+    
+    // Recursively get characters from sublocations
+    sublocations.forEach(sublocation => {
+      const sublocationCharacters = getAllCharactersInLocationHierarchy(sublocation.id);
+      allCharacters = [...allCharacters, ...sublocationCharacters];
+    });
+    
+    return allCharacters;
+  };
+  
+  // Render the NPCs panel for the selected location
+  const renderNpcsPanel = () => {
+    if (!selectedLocation) return null;
+    
+    const directNpcs = getCharactersByLocationId(selectedLocation.id);
+    const allNpcs = getAllCharactersInLocationHierarchy(selectedLocation.id);
+    const hasSublocationsWithNpcs = allNpcs.length > directNpcs.length;
+    
+    if (allNpcs.length === 0) {
+      return (
+        <Box sx={{ p: 2 }}>
+          <Typography variant="body2" color="text.secondary">
+            No NPCs in this location
+          </Typography>
+        </Box>
+      );
+    }
+    
+    return (
+      <Box>
+        <List dense>
+          {directNpcs.length > 0 && (
+            <>
+              <ListItem>
+                <ListItemText 
+                  primary={`NPCs in ${selectedLocation.name}`} 
+                  primaryTypographyProps={{ variant: 'subtitle1', fontWeight: 'bold' }}
+                />
+              </ListItem>
+              {directNpcs.map(npc => (
+                <ListItem key={npc.id}>
+                  <ListItemIcon>
+                    {npc.type === 'npc' ? <PersonIcon fontSize="small" /> : <MerchantIcon fontSize="small" />}
+                  </ListItemIcon>
+                  <ListItemText primary={npc.name} secondary={npc.description} />
+                </ListItem>
+              ))}
+              {hasSublocationsWithNpcs && <Divider sx={{ my: 1 }} />}
+            </>
+          )}
+          
+          {hasSublocationsWithNpcs && renderSublocationsNpcs(selectedLocation.id)}
+        </List>
+      </Box>
+    );
+  };
+  
+  // Recursively render NPCs in sublocations
+  const renderSublocationsNpcs = (locationId: string) => {
+    const sublocations = getSublocationsByParentId(locationId);
+    
+    return (
+      <>
+        {sublocations.map(sublocation => {
+          const npcs = getCharactersByLocationId(sublocation.id);
+          if (npcs.length === 0) return null;
+          
+          const isExpanded = expandedNpcSections[sublocation.id] || false;
+          
+          return (
+            <React.Fragment key={sublocation.id}>
+              <ListItem 
+                button 
+                onClick={() => toggleNpcSection(sublocation.id)}
+                sx={{ bgcolor: 'background.default' }}
+              >
+                <ListItemIcon>
+                  <PlaceIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText primary={`NPCs in ${sublocation.name}`} />
+                {isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+              </ListItem>
+              
+              <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+                <List dense component="div" disablePadding>
+                  {npcs.map(npc => (
+                    <ListItem key={npc.id} sx={{ pl: 4 }}>
+                      <ListItemIcon>
+                        {npc.type === 'npc' ? <PersonIcon fontSize="small" /> : <MerchantIcon fontSize="small" />}
+                      </ListItemIcon>
+                      <ListItemText primary={npc.name} secondary={npc.description} />
+                    </ListItem>
+                  ))}
+                </List>
+                
+                {renderSublocationsNpcs(sublocation.id)}
+              </Collapse>
+            </React.Fragment>
+          );
+        })}
+      </>
+    );
+  };
+  
   // Loading state for the entire application
   if (isLoading) {
     return (
@@ -653,74 +805,355 @@ export const MapView: React.FC = () => {
 
   // Render the main map view
   return (
-    <Box sx={{ position: 'relative', height: '100%', overflow: 'hidden' }}>
-      {/* Edit mode toggle button */}
-      <SpeedDial
-        ariaLabel="Edit mode"
-        sx={{ position: 'absolute', bottom: 16, right: 16, zIndex: 1000 }}
-        icon={<SpeedDialIcon icon={<EditIcon />} openIcon={<CancelIcon />} />}
-        onClick={toggleEditMode}
-        open={editMode}
-        direction="up"
+    <Box sx={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+      {/* Sidebar */}
+      <Paper 
+        elevation={3} 
+        sx={{ 
+          width: 280, 
+          height: '100%', 
+          display: 'flex', 
+          flexDirection: 'column',
+          overflow: 'hidden',
+        }}
       >
-        {editMode && (
-          <SpeedDialAction
-            icon={<SaveIcon />}
-            tooltipTitle="Save Changes"
-            onClick={() => {
-              const saveResult = useStore.getState().saveDataToIndexedDB();
-              setEditMode(false);
+        <Tabs 
+          value={showDetails ? 1 : 0} 
+          onChange={(_, value) => setShowDetails(value === 1)}
+          variant="fullWidth"
+        >
+          <Tab label="Locations" />
+          <Tab label="Details" disabled={!selectedLocation} />
+        </Tabs>
+        
+        {!showDetails ? (
+          <List 
+            sx={{ 
+              overflowY: 'auto', 
+              flexGrow: 1,
+              '& .MuiListItemButton-root.Mui-selected': {
+                bgcolor: 'primary.light',
+                '&:hover': {
+                  bgcolor: 'primary.light',
+                }
+              }
             }}
-          />
+          >
+            {getAllTopLevelLocations().map((location) => renderLocationItem(location))}
+          </List>
+        ) : (
+          <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <Box sx={{ p: 2, borderBottom: '1px solid rgba(0, 0, 0, 0.12)' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                <IconButton 
+                  size="small"
+                  onClick={() => setShowDetails(false)}
+                  sx={{ mr: 1 }}
+                >
+                  <ArrowBackIcon fontSize="small" />
+                </IconButton>
+                <Typography variant="h6" noWrap>{selectedLocation?.name}</Typography>
+                
+                {editMode && (
+                  <IconButton 
+                    size="small" 
+                    color="primary"
+                    onClick={() => {
+                      if (selectedLocation) {
+                        setEditingLocation(selectedLocation);
+                        setShowEditDialog(true);
+                      }
+                    }}
+                    sx={{ ml: 'auto' }}
+                  >
+                    <EditIcon fontSize="small" />
+                  </IconButton>
+                )}
+              </Box>
+              
+              {selectedLocation?.description && (
+                <Typography variant="body2" color="text.secondary">
+                  {selectedLocation.description}
+                </Typography>
+              )}
+            </Box>
+            
+            <Box sx={{ overflow: 'auto', flexGrow: 1 }}>
+              {/* Location details tabs */}
+              <Tabs 
+                value={detailsTab} 
+                onChange={(_, value) => setDetailsTab(value)}
+                variant="fullWidth" 
+                sx={{ borderBottom: 1, borderColor: 'divider' }}
+              >
+                <Tab label="Info" />
+                <Tab label="NPCs" />
+              </Tabs>
+              
+              {/* Info Panel */}
+              {detailsTab === 0 && (
+                <Box sx={{ p: 2 }}>
+                  {selectedLocation?.backgroundMusic && (
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="subtitle2">Background Music:</Typography>
+                      <Chip 
+                        icon={<MusicNoteIcon />} 
+                        label={selectedLocation.backgroundMusic}
+                        size="small"
+                        color="primary"
+                        variant="outlined"
+                        onClick={() => {
+                          if (selectedLocation?.backgroundMusic) {
+                            playTrack(selectedLocation.backgroundMusic, { 
+                              replace: true,
+                              locationId: selectedLocation.id,
+                              loop: true
+                            });
+                          }
+                        }}
+                      />
+                    </Box>
+                  )}
+                  
+                  {selectedLocation?.entrySound && (
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="subtitle2">Entry Sound:</Typography>
+                      <Chip 
+                        icon={<MusicNoteIcon />} 
+                        label={selectedLocation.entrySound}
+                        size="small"
+                        color="secondary"
+                        variant="outlined"
+                        onClick={() => {
+                          if (selectedLocation?.entrySound) {
+                            playTrack(selectedLocation.entrySound, { 
+                              replace: false,
+                              locationId: selectedLocation.id
+                            });
+                          }
+                        }}
+                      />
+                    </Box>
+                  )}
+                  
+                  {selectedLocation?.connectedLocations && selectedLocation.connectedLocations.length > 0 && (
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="subtitle2">Connected Locations:</Typography>
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
+                        {selectedLocation.connectedLocations.map(locId => {
+                          const connectedLoc = locations.find(l => l.id === locId);
+                          if (!connectedLoc) return null;
+                          
+                          return (
+                            <Chip 
+                              key={locId}
+                              icon={<PlaceIcon />}
+                              label={connectedLoc.name}
+                              size="small"
+                              color="info"
+                              variant="outlined"
+                              onClick={() => handleLocationClick(connectedLoc, {} as React.MouseEvent)}
+                            />
+                          );
+                        })}
+                      </Box>
+                    </Box>
+                  )}
+                </Box>
+              )}
+              
+              {/* NPCs Panel */}
+              {detailsTab === 1 && renderNpcsPanel()}
+            </Box>
+          </Box>
         )}
-      </SpeedDial>
+      </Paper>
 
-      {/* Edit mode status indicator */}
-      {editMode && (
-        <Paper
-          elevation={3}
+      {/* Main content area */}
+      <Box sx={{ 
+        flexGrow: 1, 
+        position: 'relative', 
+        height: '100%', 
+        overflow: 'hidden' 
+      }}>
+        {/* Edit mode toggle button */}
+        <SpeedDial
+          ariaLabel="Edit mode"
+          sx={{ position: 'absolute', bottom: 16, right: 16, zIndex: 100 }}
+          icon={editMode ? <CancelIcon /> : <EditIcon />}
+          onClick={toggleEditMode}
+        >
+          {editMode && (
+            <SpeedDialAction
+              icon={<SaveIcon />}
+              tooltipTitle="Save Changes"
+              onClick={handleSaveData}
+            />
+          )}
+        </SpeedDial>
+        
+        {/* Map container */}
+        <Box
+          ref={mapContainerRef}
           sx={{
-            position: 'absolute',
-            top: 16,
-            right: 16,
-            p: 1.5,
-            display: 'flex',
-            flexDirection: 'column',
-            backgroundColor: 'rgba(25, 118, 210, 0.9)',
-            color: 'white',
-            zIndex: 999,
-            borderRadius: 2,
-            maxWidth: '300px'
+            width: '100%',
+            height: '100%',
+            position: 'relative',
+            bgcolor: '#2C3333',
+            userSelect: 'none',
+            cursor: editMode ? 'crosshair' : 'default',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            overflow: 'hidden',
           }}
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-            <EditIcon sx={{ mr: 1 }} />
-            <Typography variant="body1" fontWeight="bold">
-              Edit Mode
-            </Typography>
-          </Box>
-          <Typography variant="caption" sx={{ display: 'block', mb: 0.5 }}>
-            • Click on map to add new locations
-          </Typography>
-          <Typography variant="caption" sx={{ display: 'block', mb: 0.5 }}>
-            • Drag locations to reposition
-          </Typography>
-          <Typography variant="caption" sx={{ display: 'block' }}>
-            • Click on a location to edit its details
-          </Typography>
-          <Typography variant="caption" sx={{ mt: 1, fontStyle: 'italic', opacity: 0.8 }}>
-            Pan and zoom are disabled in edit mode
-          </Typography>
-        </Paper>
-      )}
+          {isLoading ? (
+            <Box 
+              sx={{ 
+                width: '100%', 
+                height: '100%', 
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center', 
+                justifyContent: 'center',
+                backgroundColor: 'rgba(0, 0, 0, 0.2)'
+              }}
+            >
+              <CircularProgress size={60} />
+              <Typography variant="body1" sx={{ mt: 2 }}>
+                Loading map...
+              </Typography>
+            </Box>
+          ) : !imageUrl || !selectedLocation ? (
+            <Box 
+              sx={{ 
+                width: '100%', 
+                height: '100%', 
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center', 
+                justifyContent: 'center',
+                backgroundColor: 'rgba(0, 0, 0, 0.1)'
+              }}
+            >
+              <ImageNotSupportedIcon sx={{ fontSize: 60, opacity: 0.7 }} />
+              <Typography variant="body1" sx={{ mt: 2, opacity: 0.7 }}>
+                No map image available
+              </Typography>
+            </Box>
+          ) : (
+            <TransformWrapper
+              key="main-map"
+              initialScale={1}
+              initialPositionX={0}
+              initialPositionY={0}
+              minScale={0.5}
+              maxScale={5}
+              wheel={{ step: 0.1 }}
+              limitToBounds={false}
+              disablePadding={true}
+              disabled={editMode}
+            >
+              {() => (
+                <>
+                  <TransformComponent
+                    wrapperStyle={{
+                      width: '100%',
+                      height: '100%',
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      zIndex: 0,
+                    }}
+                    contentStyle={{
+                      width: '100%',
+                      height: '100%',
+                      display: 'flex',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Box 
+                      sx={{
+                        position: 'relative',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        width: '100%',
+                        height: '100%',
+                      }}
+                      onClick={editMode ? handleMapClick : undefined}
+                      onDragOver={editMode ? handleDragOver : undefined}
+                      onDrop={editMode ? handleDrop : undefined}
+                    >
+                      <img
+                        ref={imageRef}
+                        src={imageUrl}
+                        alt={selectedLocation?.name || 'Map'}
+                        style={{
+                          maxWidth: '100%',
+                          maxHeight: '100%',
+                          objectFit: 'contain',
+                          position: 'relative',
+                          zIndex: 1,
+                        }}
+                        onLoad={() => setIsImageLoading(false)}
+                        onError={() => setIsImageLoading(false)}
+                      />
+                      {renderLocationMarkers()}
+                      {getDirectionalArrows()}
+                    </Box>
+                  </TransformComponent>
+                </>
+              )}
+            </TransformWrapper>
+          )}
+          
+          {/* Empty state */}
+          {!hasLocations && !isLoading && (
+            <Box
+              sx={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 10,
+              }}
+            >
+              <Box sx={{ textAlign: 'center', maxWidth: 400, p: 3, bgcolor: 'rgba(0,0,0,0.8)', color: 'white', borderRadius: 2 }}>
+                <Typography variant="h5" gutterBottom>
+                  No locations found
+                </Typography>
+                <Typography variant="body1" paragraph>
+                  Your campaign doesn't have any locations yet. Import data or create locations in edit mode.
+                </Typography>
+                <Button 
+                  variant="contained" 
+                  color="primary" 
+                  sx={{ mr: 1 }}
+                  onClick={() => setShowAssetManager(true)}
+                >
+                  Import Assets
+                </Button>
+                <Button 
+                  variant="outlined" 
+                  color="secondary"
+                  onClick={toggleEditMode}
+                >
+                  {editMode ? 'Exit Edit Mode' : 'Enter Edit Mode'}
+                </Button>
+              </Box>
+            </Box>
+          )}
+        </Box>
+      </Box>
 
-      {/* Edit location dialog */}
-      <Dialog 
-        open={showEditDialog} 
-        onClose={() => setShowEditDialog(false)}
-        maxWidth="sm"
-        fullWidth
-      >
+      {/* Edit Location Dialog */}
+      <Dialog open={showEditDialog} onClose={() => setShowEditDialog(false)} maxWidth="md" fullWidth>
         <DialogTitle>
           Edit Location
           <IconButton
@@ -897,167 +1330,8 @@ export const MapView: React.FC = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Location sidebar drawer */}
-      <Paper
-        elevation={3}
-        sx={{
-          position: 'absolute',
-          top: 20,
-          left: 20,
-          height: 'auto',
-          maxHeight: 'calc(100% - 40px)',
-          width: 280,
-          backgroundColor: 'rgba(35, 35, 35, 0.85)',
-          color: 'white',
-          zIndex: 10,
-          display: 'flex',
-          flexDirection: 'column',
-          borderRadius: 2,
-          overflow: 'hidden',
-          backdropFilter: 'blur(5px)',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.4)'
-        }}
-      >
-        <Box sx={{ 
-          p: 2, 
-          pb: 1,
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center',
-          borderBottom: '1px solid rgba(255,255,255,0.1)'
-        }}>
-          <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-            Campaign Locations
-          </Typography>
-          
-          <Tooltip title="Manage Assets" arrow>
-            <IconButton 
-              size="small" 
-              onClick={() => setShowAssetManager(true)}
-              sx={{ 
-                color: 'white',
-                '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' }
-              }}
-            >
-              <AddIcon />
-            </IconButton>
-          </Tooltip>
-        </Box>
-        
-        {getAllTopLevelLocations().length > 0 ? (
-          <>
-            <Box sx={{ px: 2, py: 1, bgcolor: 'rgba(0,0,0,0.3)' }}>
-              <Typography variant="body2" sx={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.7)' }}>
-                Click on a location to view it on the map
-              </Typography>
-            </Box>
-            
-            <Box 
-              sx={{
-                flex: 1,
-                overflowY: 'auto',
-                px: 1,
-                py: 1,
-                '&::-webkit-scrollbar': {
-                  width: '8px',
-                },
-                '&::-webkit-scrollbar-track': {
-                  background: 'rgba(0,0,0,0.1)',
-                },
-                '&::-webkit-scrollbar-thumb': {
-                  background: 'rgba(255,255,255,0.2)',
-                  borderRadius: '4px',
-                },
-                '&::-webkit-scrollbar-thumb:hover': {
-                  background: 'rgba(255,255,255,0.3)',
-                },
-              }}
-            >
-              <List sx={{ width: '100%', bgcolor: 'transparent', p: 0 }} component="nav">
-                {getAllTopLevelLocations().map((location) => renderLocationItem(location))}
-              </List>
-            </Box>
-          </>
-        ) : (
-          <Box sx={{ p: 2, textAlign: 'center' }}>
-            <Typography variant="body2" color="error.main" paragraph>
-              No locations found in your campaign data.
-            </Typography>
-            <Button 
-              variant="outlined" 
-              size="small"
-              color="primary"
-              onClick={() => setShowAssetManager(true)}
-            >
-              Import Data
-            </Button>
-          </Box>
-        )}
-        
-        {selectedLocation && (
-          <Box sx={{ 
-            p: 2,
-            bgcolor: 'rgba(0,0,0,0.2)',
-            borderTop: '1px solid rgba(255,255,255,0.1)'
-          }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1 }}>
-              {selectedLocation.name}
-            </Typography>
-            {selectedLocation.description && (
-              <Typography variant="body2" sx={{ fontSize: '0.8rem', mb: 1, color: 'rgba(255,255,255,0.8)' }}>
-                {selectedLocation.description}
-              </Typography>
-            )}
-          </Box>
-        )}
-      </Paper>
-
-      {/* Details Panel - Non-modal */}
-      {selectedLocation && showDetails && (
-        <Paper
-          elevation={3}
-          sx={{
-            position: 'absolute',
-            top: 20,
-            right: 20,
-            p: 2,
-            width: 300,
-            maxHeight: 'calc(100% - 40px)',
-            overflowY: 'auto',
-            backgroundColor: 'rgba(45, 45, 45, 0.9)',
-            zIndex: 10,
-          }}
-        >
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h6">
-              {selectedLocation.name}
-            </Typography>
-            <IconButton size="small" onClick={() => setShowDetails(false)}>
-              <CloseIcon />
-            </IconButton>
-          </Box>
-          <Typography variant="h6" gutterBottom>
-            {selectedLocation.name}
-          </Typography>          
-          <Typography variant="body1" paragraph>
-            {selectedLocation.description}
-          </Typography>
-          
-          {selectedLocation.parentLocationId && (
-            <Typography variant="body2" sx={{ mt: 2, fontStyle: 'italic' }}>
-              This is a sublocation of {locations.find(loc => loc.id === selectedLocation.parentLocationId)?.name}
-            </Typography>
-          )}
-        </Paper>
-      )}
-
       {/* Asset Manager Dialog */}
-      <Dialog
-        open={showAssetManager}
-        onClose={() => setShowAssetManager(false)}
-        maxWidth="md"
-        fullWidth
-      >
+      <Dialog open={showAssetManager} onClose={() => setShowAssetManager(false)} maxWidth="md" fullWidth>
         <DialogTitle>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             Asset Manager
@@ -1075,120 +1349,6 @@ export const MapView: React.FC = () => {
       </Dialog>
 
       <AudioTrackPanel />
-
-      {/* Map container */}
-      <Box 
-        ref={mapContainerRef} 
-        sx={{ 
-          position: 'relative', 
-          height: '100%',
-          cursor: editMode ? 'crosshair' : 'default'
-        }}
-      >
-        {isLoading || isImageLoading ? (
-          <Box 
-            sx={{ 
-              width: '100%', 
-              height: '100%', 
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center', 
-              justifyContent: 'center',
-              backgroundColor: 'rgba(0, 0, 0, 0.2)'
-            }}
-          >
-            <CircularProgress size={60} />
-            <Typography variant="body1" sx={{ mt: 2 }}>
-              Loading map...
-            </Typography>
-          </Box>
-        ) : !imageUrl || !selectedLocation ? (
-          <Box 
-            sx={{ 
-              width: '100%', 
-              height: '100%', 
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center', 
-              justifyContent: 'center',
-              backgroundColor: 'rgba(0, 0, 0, 0.1)'
-            }}
-          >
-            <ImageNotSupportedIcon sx={{ fontSize: 60, opacity: 0.7 }} />
-            <Typography variant="body1" sx={{ mt: 2, opacity: 0.7 }}>
-              No map image available
-            </Typography>
-          </Box>
-        ) : (
-          <TransformWrapper
-            key="main-map"
-            initialScale={1}
-            initialPositionX={0}
-            initialPositionY={0}
-            minScale={0.5}
-            maxScale={5}
-            wheel={{ step: 0.1 }}
-            limitToBounds={false}
-            disablePadding={true}
-            // Disable pan and zoom when in edit mode
-            disabled={editMode}
-          >
-            {() => (
-              <>
-                <TransformComponent
-                  wrapperStyle={{
-                    width: '100%',
-                    height: '100%',
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    zIndex: 0,
-                  }}
-                  contentStyle={{
-                    width: '100%',
-                    height: '100%',
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                  }}
-                >
-                  <Box 
-                    sx={{
-                      position: 'relative',
-                      display: 'flex',
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                      width: '100%',
-                      height: '100%',
-                    }}
-                    onClick={editMode ? handleMapClick : undefined}
-                    onDragOver={editMode ? handleDragOver : undefined}
-                    onDrop={editMode ? handleDrop : undefined}
-                  >
-                    <img
-                      ref={imageRef}
-                      src={imageUrl}
-                      alt={selectedLocation?.name || 'Map'}
-                      style={{
-                        maxWidth: '100%',
-                        maxHeight: '100%',
-                        objectFit: 'contain',
-                        position: 'relative',
-                        zIndex: 1,
-                      }}
-                      onLoad={() => setIsImageLoading(false)}
-                      onError={() => setIsImageLoading(false)}
-                    />
-                    {renderLocationMarkers()}
-                    {getDirectionalArrows()}
-                  </Box>
-                </TransformComponent>
-                
-              </>
-            )}
-          </TransformWrapper>
-        )}
-      </Box>
     </Box>
   );
 }; 

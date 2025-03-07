@@ -38,6 +38,7 @@ interface Character {
   description: string;
   type: 'npc' | 'merchant';
   inventory?: Item[];
+  locationId?: string;
 }
 
 interface Item {
