@@ -443,7 +443,7 @@ export const LocationsView: React.FC = () => {
                 value={newLocation.coordinates[0]}
                 onChange={(e) => setNewLocation({ 
                   ...newLocation, 
-                  coordinates: [parseInt(e.target.value) || 0, newLocation.coordinates[1]] 
+                  coordinates: [parseFloat(e.target.value) || 0, newLocation.coordinates[1]] 
                 })}
                 InputProps={{
                   startAdornment: <InputAdornment position="start">X:</InputAdornment>,
@@ -459,7 +459,7 @@ export const LocationsView: React.FC = () => {
                 value={newLocation.coordinates[1]}
                 onChange={(e) => setNewLocation({ 
                   ...newLocation, 
-                  coordinates: [newLocation.coordinates[0], parseInt(e.target.value) || 0] 
+                  coordinates: [newLocation.coordinates[0], parseFloat(e.target.value) || 0] 
                 })}
                 InputProps={{
                   startAdornment: <InputAdornment position="start">Y:</InputAdornment>,
@@ -587,7 +587,7 @@ export const LocationsView: React.FC = () => {
                 value={newLocation.coordinates[0]}
                 onChange={(e) => setNewLocation({ 
                   ...newLocation, 
-                  coordinates: [parseInt(e.target.value) || 0, newLocation.coordinates[1]] 
+                  coordinates: [parseFloat(e.target.value) || 0, newLocation.coordinates[1]] 
                 })}
                 InputProps={{
                   startAdornment: <InputAdornment position="start">X:</InputAdornment>,
@@ -603,7 +603,7 @@ export const LocationsView: React.FC = () => {
                 value={newLocation.coordinates[1]}
                 onChange={(e) => setNewLocation({ 
                   ...newLocation, 
-                  coordinates: [newLocation.coordinates[0], parseInt(e.target.value) || 0] 
+                  coordinates: [newLocation.coordinates[0], parseFloat(e.target.value) || 0] 
                 })}
                 InputProps={{
                   startAdornment: <InputAdornment position="start">Y:</InputAdornment>,

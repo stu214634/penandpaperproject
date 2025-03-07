@@ -152,44 +152,62 @@ export const MapView: React.FC = () => {
       if (!sublocation.coordinates) return null;
 
       const [relX, relY] = sublocation.coordinates;
+      const isSelected = selectedLocation?.id === sublocation.id;
 
       return (
-        <Box
-          key={sublocation.id}
-          sx={{
-            position: 'absolute',
-            left: `${relX * 100}%`,
-            top: `${relY * 100}%`,
-            transform: 'translate(-50%, -50%)',
-            zIndex: 5,
-            cursor: 'pointer',
-          }}
-          onClick={(e) => handleLocationClick(sublocation, e)}
+        <Tooltip 
+          key={sublocation.id} 
+          title={sublocation.name}
+          arrow
+          placement="top"
         >
-          <PlaceIcon 
-            color="error" 
-            sx={{ 
-              fontSize: '2rem',
-              filter: 'drop-shadow(0px 0px 2px rgba(0, 0, 0, 0.7))'
-            }} 
-          />
-          <Typography
-            variant="caption"
+          <Box
             sx={{
               position: 'absolute',
-              top: '100%',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              backgroundColor: 'rgba(0, 0, 0, 0.7)',
-              color: 'white',
-              padding: '2px 4px',
-              borderRadius: '4px',
-              whiteSpace: 'nowrap'
+              left: `${relX * 100}%`,
+              top: `${relY * 100}%`,
+              transform: 'translate(-50%, -50%)',
+              zIndex: 5,
+              cursor: 'pointer',
+              transition: 'all 0.2s ease-in-out',
+              '&:hover': {
+                transform: 'translate(-50%, -50%) scale(1.2)',
+              }
             }}
+            onClick={(e) => handleLocationClick(sublocation, e)}
           >
-            {sublocation.name}
-          </Typography>
-        </Box>
+            <PlaceIcon 
+              color={isSelected ? "primary" : "error"} 
+              sx={{ 
+                fontSize: isSelected ? '2.5rem' : '2rem',
+                filter: 'drop-shadow(0px 0px 4px rgba(0, 0, 0, 0.9))'
+              }} 
+            />
+            <Typography
+              variant="caption"
+              sx={{
+                position: 'absolute',
+                top: '100%',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                whiteSpace: 'nowrap',
+                backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                color: 'white',
+                padding: '2px 6px',
+                borderRadius: '4px',
+                fontSize: '0.7rem',
+                fontWeight: 'bold',
+                textAlign: 'center',
+                maxWidth: '120px',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                filter: 'drop-shadow(0px 0px 2px rgba(0, 0, 0, 0.5))'
+              }}
+            >
+              {sublocation.name}
+            </Typography>
+          </Box>
+        </Tooltip>
       );
     });
   };
@@ -446,7 +464,14 @@ export const MapView: React.FC = () => {
 
   // Normal render with locations
   return (
-    <Box sx={{ height: 'calc(100vh - 64px)', position: 'relative', overflow: 'hidden' }}>
+    <Box sx={{ 
+      height: 'calc(100vh - 64px)', 
+      width: '100%',
+      position: 'relative', 
+      overflow: 'hidden',
+      display: 'flex',
+      flexDirection: 'column'
+    }}>
       {/* Background Image with Zoom and Pan */}
       {selectedLocation && (
         <TransformWrapper
@@ -473,16 +498,17 @@ export const MapView: React.FC = () => {
                   width: '100%',
                   height: '100%',
                   display: 'flex',
-                  justifyContent: 'flex-start',
-                  alignItems: 'flex-start',
+                  justifyContent: 'center',
+                  alignItems: 'center',
                 }}
               >
                 <Box 
                   ref={mapContainerRef}
                   sx={{
                     position: 'relative',
-                    width: '100%',
-                    height: '100%',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
                     '&::after': {
                       content: '""',
                       position: 'absolute',
@@ -544,19 +570,31 @@ export const MapView: React.FC = () => {
                       </Typography>
                     </Box>
                   ) : (
-                    <img
-                      src={imageUrl}
-                      alt={selectedLocation.name}
-                      style={{
+                    <Box
+                      sx={{
+                        position: 'relative',
                         width: '100%',
                         height: '100%',
-                        objectFit: 'contain',
-                        position: 'relative',
-                        zIndex: 1,
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        overflow: 'hidden',
                       }}
-                      onLoad={() => setIsImageLoading(false)}
-                      onError={() => setIsImageLoading(false)}
-                    />
+                    >
+                      <img
+                        src={imageUrl}
+                        alt={selectedLocation.name}
+                        style={{
+                          maxWidth: '100%',
+                          maxHeight: '100%',
+                          objectFit: 'contain',
+                          position: 'relative',
+                          zIndex: 1,
+                        }}
+                        onLoad={() => setIsImageLoading(false)}
+                        onError={() => setIsImageLoading(false)}
+                      />
+                    </Box>
                   )}
                   {renderLocationMarkers()}
                   {getDirectionalArrows()}
@@ -570,39 +608,84 @@ export const MapView: React.FC = () => {
                   position: 'absolute',
                   bottom: 20,
                   right: 20,
-                  p: 1,
+                  p: 2,
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
-                  gap: 1,
-                  backgroundColor: 'rgba(45, 45, 45, 0.9)',
+                  gap: 1.5,
+                  backgroundColor: 'rgba(30, 30, 30, 0.8)',
                   zIndex: 10,
-                  width: 150,
+                  width: 'auto',
+                  borderRadius: 2,
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
                 }}
               >
-                {/* Map Navigation instead of Volume Slider */}
-                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, width: '100%' }}>
-                  <Typography variant="caption" sx={{ color: 'white' }}>
-                    Map Navigation
-                  </Typography>
+                <Typography variant="caption" sx={{ color: 'white', fontWeight: 'bold', mb: 0.5 }}>
+                  Map Controls
+                </Typography>
+                
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Tooltip title="Zoom In" arrow placement="top">
+                    <IconButton 
+                      onClick={() => zoomIn()} 
+                      size="small" 
+                      sx={{ 
+                        bgcolor: 'rgba(255,255,255,0.1)', 
+                        color: 'white',
+                        '&:hover': {
+                          bgcolor: 'rgba(255,255,255,0.2)',
+                        }
+                      }}
+                    >
+                      <AddIcon />
+                    </IconButton>
+                  </Tooltip>
+                  
+                  <Tooltip title="Zoom Out" arrow placement="top">
+                    <IconButton 
+                      onClick={() => zoomOut()} 
+                      size="small" 
+                      sx={{ 
+                        bgcolor: 'rgba(255,255,255,0.1)', 
+                        color: 'white',
+                        '&:hover': {
+                          bgcolor: 'rgba(255,255,255,0.2)',
+                        }
+                      }}
+                    >
+                      <RemoveIcon />
+                    </IconButton>
+                  </Tooltip>
+                  
+                  <Tooltip title="Reset View" arrow placement="top">
+                    <IconButton 
+                      onClick={() => resetTransform()} 
+                      size="small" 
+                      sx={{ 
+                        bgcolor: 'rgba(255,255,255,0.1)', 
+                        color: 'white',
+                        '&:hover': {
+                          bgcolor: 'rgba(255,255,255,0.2)',
+                        }
+                      }}
+                    >
+                      <RestartAltIcon />
+                    </IconButton>
+                  </Tooltip>
                 </Box>
                 
-                {/* Existing zoom buttons */}
-                <IconButton onClick={() => zoomIn()} size="small">
-                  <AddIcon />
-                </IconButton>
-                <IconButton onClick={() => zoomOut()} size="small">
-                  <RemoveIcon />
-                </IconButton>
-                <IconButton onClick={() => resetTransform()} size="small">
-                  <RestartAltIcon />
-                </IconButton>
-                
-                {/* Asset Manager Toggle Button */}
                 <Button 
                   variant="outlined" 
                   size="small" 
-                  sx={{ mt: 1, width: '100%' }}
+                  sx={{ 
+                    mt: 1,
+                    color: 'white',
+                    borderColor: 'rgba(255,255,255,0.3)',
+                    '&:hover': {
+                      borderColor: 'white',
+                      bgcolor: 'rgba(255,255,255,0.1)',
+                    }
+                  }}
                   onClick={() => setShowAssetManager(!showAssetManager)}
                 >
                   {showAssetManager ? 'Hide Assets' : 'Manage Assets'}
@@ -620,50 +703,112 @@ export const MapView: React.FC = () => {
           position: 'absolute',
           top: 20,
           left: 20,
-          p: 2,
-          maxWidth: 300,
+          height: 'auto',
           maxHeight: 'calc(100% - 40px)',
-          overflowY: 'auto',
-          backgroundColor: 'rgba(45, 45, 45, 0.9)',
+          width: 280,
+          backgroundColor: 'rgba(35, 35, 35, 0.85)',
+          color: 'white',
           zIndex: 10,
+          display: 'flex',
+          flexDirection: 'column',
+          borderRadius: 2,
+          overflow: 'hidden',
+          backdropFilter: 'blur(5px)',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.4)'
         }}
       >
-        <Typography variant="h6" gutterBottom>
-          Campaign Locations
-        </Typography>
+        <Box sx={{ 
+          p: 2, 
+          pb: 1,
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          borderBottom: '1px solid rgba(255,255,255,0.1)'
+        }}>
+          <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+            Campaign Locations
+          </Typography>
+          
+          <Tooltip title="Manage Assets" arrow>
+            <IconButton 
+              size="small" 
+              onClick={() => setShowAssetManager(true)}
+              sx={{ 
+                color: 'white',
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' }
+              }}
+            >
+              <AddIcon />
+            </IconButton>
+          </Tooltip>
+        </Box>
         
         {getAllTopLevelLocations().length > 0 ? (
           <>
-            <Typography variant="body2" sx={{ mb: 2 }}>
-              Click on locations to change the background.
-            </Typography>
+            <Box sx={{ px: 2, py: 1, bgcolor: 'rgba(0,0,0,0.3)' }}>
+              <Typography variant="body2" sx={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.7)' }}>
+                Click on a location to view it on the map
+              </Typography>
+            </Box>
             
             <Box 
               sx={{
                 flex: 1,
                 overflowY: 'auto',
+                px: 1,
+                py: 1,
+                '&::-webkit-scrollbar': {
+                  width: '8px',
+                },
+                '&::-webkit-scrollbar-track': {
+                  background: 'rgba(0,0,0,0.1)',
+                },
+                '&::-webkit-scrollbar-thumb': {
+                  background: 'rgba(255,255,255,0.2)',
+                  borderRadius: '4px',
+                },
+                '&::-webkit-scrollbar-thumb:hover': {
+                  background: 'rgba(255,255,255,0.3)',
+                },
               }}
             >
-              <List sx={{ width: '100%', bgcolor: 'transparent' }} component="nav">
+              <List sx={{ width: '100%', bgcolor: 'transparent', p: 0 }} component="nav">
                 {getAllTopLevelLocations().map((location) => renderLocationItem(location))}
               </List>
             </Box>
           </>
         ) : (
-          <Typography variant="body2" color="error.main">
-            No locations found. Please check your imported data.
-          </Typography>
+          <Box sx={{ p: 2, textAlign: 'center' }}>
+            <Typography variant="body2" color="error.main" paragraph>
+              No locations found in your campaign data.
+            </Typography>
+            <Button 
+              variant="outlined" 
+              size="small"
+              color="primary"
+              onClick={() => setShowAssetManager(true)}
+            >
+              Import Data
+            </Button>
+          </Box>
         )}
         
-        {/* Asset management button in the locations panel for easy access */}
-        <Button 
-          variant="outlined" 
-          fullWidth
-          sx={{ mt: 2 }}
-          onClick={() => setShowAssetManager(!showAssetManager)}
-        >
-          {showAssetManager ? 'Hide Asset Manager' : 'Manage Assets'}
-        </Button>
+        {selectedLocation && (
+          <Box sx={{ 
+            p: 2,
+            bgcolor: 'rgba(0,0,0,0.2)',
+            borderTop: '1px solid rgba(255,255,255,0.1)'
+          }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1 }}>
+              {selectedLocation.name}
+            </Typography>
+            {selectedLocation.description && (
+              <Typography variant="body2" sx={{ fontSize: '0.8rem', mb: 1, color: 'rgba(255,255,255,0.8)' }}>
+                {selectedLocation.description}
+              </Typography>
+            )}
+          </Box>
+        )}
       </Paper>
 
       {/* Details Panel - Non-modal */}
