@@ -70,6 +70,7 @@ interface StoreState {
     worldWidth: number;
     worldHeight: number;
   };
+  selectedLocationId: string | null;
   characters: Character[];
   audioTracks: AudioTrack[];
   currentLocation?: CustomLocation;
@@ -98,6 +99,7 @@ interface StoreState {
   refreshAssets: () => void;
   saveDataToIndexedDB: () => Promise<{ success: boolean; message: string }>;
   exportToZip: () => Promise<{ success: boolean; message: string; url?: string }>;
+  setSelectedLocationId: (locationId: string | null) => void;
 }
 
 export const useStore = create<StoreState>((set, get) => {
@@ -142,9 +144,10 @@ export const useStore = create<StoreState>((set, get) => {
   return {
     locations: initialLocations,
     mapConfig: {
-      worldWidth: 1000,
-      worldHeight: 1000
+      worldWidth: 1920,
+      worldHeight: 1080,
     },
+    selectedLocationId: null,
     characters: initialCharacters,
     audioTracks: [],
     currentLocation: undefined,
@@ -579,6 +582,10 @@ export const useStore = create<StoreState>((set, get) => {
           message: `Error exporting data: ${error instanceof Error ? error.message : String(error)}` 
         };
       }
+    },
+
+    setSelectedLocationId: (locationId) => {
+      set({ selectedLocationId: locationId });
     },
   };
 }); 

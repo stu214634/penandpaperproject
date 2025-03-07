@@ -42,6 +42,10 @@ export const MapView: React.FC = () => {
   const hasAssets = useStore((state) => state.hasAssets);
   const isLoading = useStore((state) => state.isLoading);
   
+  // Get only the selected location ID from the store
+  const selectedLocationId = useStore((state) => state.selectedLocationId);
+  const setSelectedLocationId = useStore((state) => state.setSelectedLocationId);
+  
   // State for location and details
   const [selectedLocation, setSelectedLocation] = useState<CustomLocation | null>(null);
   const [showDetails, setShowDetails] = useState(false);
@@ -60,6 +64,34 @@ export const MapView: React.FC = () => {
   // Background image handling with state
   const [imageUrl, setImageUrl] = useState<string>('');
   
+  // Effect to initialize the selected location from the saved state
+  useEffect(() => {
+    if (locations.length > 0) {
+      if (selectedLocationId) {
+        // If we have a saved location ID, try to load that location
+        const savedLocation = locations.find(loc => loc.id === selectedLocationId);
+        if (savedLocation) {
+          setSelectedLocation(savedLocation);
+          setShowDetails(true);
+        } else {
+          // If saved location doesn't exist anymore, load the first location
+          const topLocations = getAllTopLevelLocations();
+          if (topLocations.length > 0) {
+            setSelectedLocation(topLocations[0]);
+            setSelectedLocationId(topLocations[0].id);
+          }
+        }
+      } else {
+        // No saved location, load the first one
+        const topLocations = getAllTopLevelLocations();
+        if (topLocations.length > 0) {
+          setSelectedLocation(topLocations[0]);
+          setSelectedLocationId(topLocations[0].id);
+        }
+      }
+    }
+  }, [locations, selectedLocationId]);
+  
   // Effect to load the image when the selected location changes
   useEffect(() => {
     if (selectedLocation) {
@@ -75,6 +107,9 @@ export const MapView: React.FC = () => {
         }
       };
       loadImage();
+      
+      // Save the selected location ID in the store
+      setSelectedLocationId(selectedLocation.id);
     }
   }, [selectedLocation?.id]);
   
@@ -472,6 +507,8 @@ export const MapView: React.FC = () => {
         <TransformWrapper
           key="main-map"
           initialScale={1}
+          initialPositionX={0}
+          initialPositionY={0}
           minScale={0.5}
           maxScale={5}
           wheel={{ step: 0.1 }}
@@ -548,20 +585,16 @@ export const MapView: React.FC = () => {
                       sx={{ 
                         width: '100%', 
                         height: '100%', 
-                        display: 'flex', 
+                        display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center', 
                         justifyContent: 'center',
-                        color: 'text.secondary',
-                        backgroundColor: 'rgba(0, 0, 0, 0.2)'
+                        backgroundColor: 'rgba(0, 0, 0, 0.1)'
                       }}
                     >
-                      <ImageNotSupportedIcon sx={{ fontSize: 64, mb: 2 }} />
-                      <Typography variant="h6" align="center">
-                        No image available for {selectedLocation.name}
-                      </Typography>
-                      <Typography variant="body2" align="center" sx={{ mt: 1, maxWidth: '80%' }}>
-                        To add an image, include "{selectedLocation.id}.jpg" in the images folder of your assets zip file.
+                      <ImageNotSupportedIcon sx={{ fontSize: 60, opacity: 0.7 }} />
+                      <Typography variant="body1" sx={{ mt: 2, opacity: 0.7 }}>
+                        No map image available
                       </Typography>
                     </Box>
                   ) : (
@@ -865,7 +898,6 @@ export const MapView: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Audio track panel - always show it now, regardless of whether there are tracks playing */}
       <AudioTrackPanel />
     </Box>
   );
