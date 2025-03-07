@@ -51,7 +51,7 @@ export const MapView: React.FC = () => {
   const [selectedLocation, setSelectedLocation] = useState<CustomLocation | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   // Asset manager panel is shown by default if no assets are available
-  const [showAssetManager, setShowAssetManager] = useState(!hasAssets);
+  const [showAssetManager, setShowAssetManager] = useState(hasAssets);
   
   // Additional state for image loading
   const [isImageLoading, setIsImageLoading] = useState(false);
