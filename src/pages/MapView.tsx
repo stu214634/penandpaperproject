@@ -15,13 +15,24 @@ import {
   CircularProgress,
   Dialog,
   DialogTitle,
-  DialogContent
+  DialogContent,
+  DialogActions,
+  TextField,
+  FormControlLabel,
+  Checkbox,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Stack,
+  SpeedDial,
+  SpeedDialIcon,
+  SpeedDialAction
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
-import PlaceIcon from '@mui/icons-material/Place';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { useStore } from '../store';
 import { CustomLocation } from '../store';
@@ -31,6 +42,18 @@ import { AudioTrackPanel } from '../components/AudioTrackPanel';
 import { AssetDropZone } from '../components/AssetDropZone';
 import { AssetManager } from '../services/assetManager';
 import ImageNotSupportedIcon from '@mui/icons-material/ImageNotSupported';
+import { 
+  PlaceOutlined as PlaceIcon,
+  ArrowUpward as ArrowUpwardIcon,
+  ArrowDownward as ArrowDownwardIcon,
+  ArrowBack as ArrowBackIcon,
+  ArrowForward as ArrowForwardIcon,
+  Edit as EditIcon,
+  Save as SaveIcon,
+  Cancel as CancelIcon,
+  Delete as DeleteIcon,
+  MusicNote as MusicNoteIcon
+} from '@mui/icons-material';
 
 export const MapView: React.FC = () => {
   const locations = useStore((state) => state.locations);
@@ -52,14 +75,25 @@ export const MapView: React.FC = () => {
   // Asset manager panel is shown by default if no assets are available
   const [showAssetManager, setShowAssetManager] = useState(false);
   
+  // Edit mode state
+  const [editMode, setEditMode] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [editingLocation, setEditingLocation] = useState<CustomLocation | null>(null);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const imageRef = useRef<HTMLImageElement>(null);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  
   // Additional state for image loading
   const [isImageLoading, setIsImageLoading] = useState(false);
   
+  // State for audio assets
+  const [audioAssets, setAudioAssets] = useState<string[]>([]);
+  
+  // State for image assets
+  const [imageAssets, setImageAssets] = useState<string[]>([]);
+  
   // Additional checks for the empty state
   const hasLocations = locations.length > 0;
-  
-  // Reference to the map container for calculating relative coordinates
-  const mapContainerRef = useRef<HTMLDivElement>(null);
   
   // Background image handling with state
   const [imageUrl, setImageUrl] = useState<string>('');
@@ -98,10 +132,17 @@ export const MapView: React.FC = () => {
       const loadImage = async () => {
         setIsImageLoading(true);
         try {
-          const url = await AssetManager.getAssetUrl('images', `${selectedLocation.id}.jpg`);
-          setImageUrl(url);
+          // Use the location's imageUrl property if available
+          if (selectedLocation.imageUrl) {
+            const url = await AssetManager.getAssetUrl('images', selectedLocation.imageUrl);
+            setImageUrl(url);
+          } else {
+            // Clear the image URL if no image is selected
+            setImageUrl('');
+          }
         } catch (error) {
           console.error('Error loading image:', error);
+          setImageUrl('');
         } finally {
           setIsImageLoading(false);
         }
@@ -111,11 +152,46 @@ export const MapView: React.FC = () => {
       // Save the selected location ID in the store
       setSelectedLocationId(selectedLocation.id);
     }
-  }, [selectedLocation?.id]);
+  }, [selectedLocation?.id, selectedLocation?.imageUrl]);
+  
+  // Load available audio assets when the edit dialog opens
+  useEffect(() => {
+    if (showEditDialog) {
+      const loadAudioAssets = async () => {
+        try {
+          const assets = await AssetManager.getAssets('audio');
+          setAudioAssets(assets.map(asset => asset.name));
+        } catch (error) {
+          console.error('Failed to load audio assets:', error);
+          setAudioAssets([]);
+        }
+      };
+      
+      const loadImageAssets = async () => {
+        try {
+          const assets = await AssetManager.getAssets('images');
+          setImageAssets(assets.map(asset => asset.name));
+        } catch (error) {
+          console.error('Failed to load image assets:', error);
+          setImageAssets([]);
+        }
+      };
+      
+      loadAudioAssets();
+      loadImageAssets();
+    }
+  }, [showEditDialog]);
   
   // Handle location selection
   const handleLocationClick = async (location: CustomLocation, e: React.MouseEvent) => {
     e.stopPropagation();
+    
+    // If in edit mode, show edit dialog instead of regular selection
+    if (editMode) {
+      setEditingLocation(location);
+      setShowEditDialog(true);
+      return;
+    }
     
     if (selectedLocation?.id !== location.id) {
       setSelectedLocation(location);
@@ -172,6 +248,87 @@ export const MapView: React.FC = () => {
     }
   };
   
+  // Handle map click to add a new location in edit mode
+  const handleMapClick = (e: React.MouseEvent) => {
+    if (!editMode || !selectedLocation || !imageRef.current || !mapContainerRef.current) return;
+    
+    // Get mouse coordinates relative to the image
+    const rect = mapContainerRef.current.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width;
+    const y = (e.clientY - rect.top) / rect.height;
+    
+    // Create a new location with default values
+    const newLocationData: Omit<CustomLocation, 'id'> = {
+      name: 'New Location',
+      description: 'Add a description',
+      coordinates: [x, y],
+      parentLocationId: selectedLocation.id,
+    };
+    
+    // Add the new location to the store
+    const addLocation = useStore.getState().addLocation;
+    addLocation(newLocationData);
+    
+    // Save to IndexedDB
+    useStore.getState().saveDataToIndexedDB();
+  };
+  
+  // Handle location drag events
+  const handleDragStart = (locationId: string, e: React.DragEvent) => {
+    if (!editMode) return;
+    
+    // Set a transparent drag image (prevents the default element preview)
+    const img = new Image();
+    img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+    e.dataTransfer.setDragImage(img, 0, 0);
+    
+    e.dataTransfer.setData('locationId', locationId);
+    setIsDragging(true);
+  };
+  
+  const handleDragOver = (e: React.DragEvent) => {
+    if (!editMode) return;
+    e.preventDefault();
+  };
+  
+  const handleDrop = (e: React.DragEvent) => {
+    if (!editMode || !imageRef.current || !mapContainerRef.current) return;
+    e.preventDefault();
+    
+    const locationId = e.dataTransfer.getData('locationId');
+    if (!locationId) return;
+    
+    // Get the location to update
+    const locations = useStore.getState().locations;
+    const locationToUpdate = locations.find(loc => loc.id === locationId);
+    if (!locationToUpdate) return;
+    
+    // Calculate new coordinates
+    const rect = mapContainerRef.current.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width;
+    const y = (e.clientY - rect.top) / rect.height;
+    
+    // Update location coordinates
+    const updateLocation = useStore.getState().updateLocation;
+    updateLocation(locationId, { coordinates: [x, y] });
+    
+    // Save to IndexedDB
+    useStore.getState().saveDataToIndexedDB();
+    
+    setIsDragging(false);
+  };
+  
+  // Toggle edit mode
+  const toggleEditMode = () => {
+    setEditMode(!editMode);
+    
+    // Close edit dialog if open
+    if (showEditDialog) {
+      setShowEditDialog(false);
+      setEditingLocation(null);
+    }
+  };
+  
   // Render location markers on the map
   const renderLocationMarkers = () => {
     if (!selectedLocation) return null;
@@ -187,7 +344,7 @@ export const MapView: React.FC = () => {
       return (
         <Tooltip 
           key={sublocation.id} 
-          title={sublocation.name}
+          title={editMode ? "Drag to move, click to edit" : sublocation.name}
           arrow
           placement="top"
         >
@@ -198,16 +355,18 @@ export const MapView: React.FC = () => {
               top: `${relY * 100}%`,
               transform: 'translate(-50%, -50%)',
               zIndex: 5,
-              cursor: 'pointer',
+              cursor: editMode ? 'move' : 'pointer',
               transition: 'all 0.2s ease-in-out',
               '&:hover': {
                 transform: 'translate(-50%, -50%) scale(1.2)',
               }
             }}
             onClick={(e) => handleLocationClick(sublocation, e)}
+            draggable={editMode}
+            onDragStart={(e) => handleDragStart(sublocation.id, e)}
           >
             <PlaceIcon 
-              color={isSelected ? "primary" : "error"} 
+              color={isSelected ? "primary" : editMode ? "secondary" : "error"} 
               sx={{ 
                 fontSize: isSelected ? '2.5rem' : '2rem',
                 filter: 'drop-shadow(0px 0px 4px rgba(0, 0, 0, 0.9))'
@@ -492,239 +651,253 @@ export const MapView: React.FC = () => {
     );
   }
 
-  // Normal render with locations
+  // Render the main map view
   return (
-    <Box sx={{ 
-      height: 'calc(100vh - 64px)', 
-      width: '100%',
-      position: 'relative', 
-      overflow: 'hidden',
-      display: 'flex',
-      flexDirection: 'column'
-    }}>
-      {/* Background Image with Zoom and Pan */}
-      {selectedLocation && (
-        <TransformWrapper
-          key="main-map"
-          initialScale={1}
-          initialPositionX={0}
-          initialPositionY={0}
-          minScale={0.5}
-          maxScale={5}
-          wheel={{ step: 0.1 }}
-          limitToBounds={false}
-          disablePadding={true}
+    <Box sx={{ position: 'relative', height: '100%', overflow: 'hidden' }}>
+      {/* Edit mode toggle button */}
+      <SpeedDial
+        ariaLabel="Edit mode"
+        sx={{ position: 'absolute', bottom: 16, right: 16, zIndex: 1000 }}
+        icon={<SpeedDialIcon icon={<EditIcon />} openIcon={<CancelIcon />} />}
+        onClick={toggleEditMode}
+        open={editMode}
+        direction="up"
+      >
+        {editMode && (
+          <SpeedDialAction
+            icon={<SaveIcon />}
+            tooltipTitle="Save Changes"
+            onClick={() => {
+              const saveResult = useStore.getState().saveDataToIndexedDB();
+              setEditMode(false);
+            }}
+          />
+        )}
+      </SpeedDial>
+
+      {/* Edit mode status indicator */}
+      {editMode && (
+        <Paper
+          elevation={3}
+          sx={{
+            position: 'absolute',
+            top: 16,
+            right: 16,
+            p: 1.5,
+            display: 'flex',
+            flexDirection: 'column',
+            backgroundColor: 'rgba(25, 118, 210, 0.9)',
+            color: 'white',
+            zIndex: 999,
+            borderRadius: 2,
+            maxWidth: '300px'
+          }}
         >
-          {({ zoomIn, zoomOut, resetTransform }) => (
-            <>
-              <TransformComponent
-                wrapperStyle={{
-                  width: '100%',
-                  height: '100%',
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  zIndex: 0,
-                }}
-                contentStyle={{
-                  width: '100%',
-                  height: '100%',
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                }}
-              >
-                <Box 
-                  ref={mapContainerRef}
-                  sx={{
-                    position: 'relative',
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    '&::after': {
-                      content: '""',
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      background: `
-                        radial-gradient(
-                          circle at center,
-                          transparent 30%,
-                          rgba(45, 45, 45, 0.9) 100%
-                        )
-                      `,
-                      pointerEvents: 'none',
-                      zIndex: 2,
-                      mixBlendMode: 'multiply',
-                      boxShadow: 'inset 0 0 50px 20px rgba(0,0,0,0.2)'
-                    }
-                  }}
-                >
-                  {/* Background image with loading state and fallback */}
-                  {isImageLoading ? (
-                    <Box 
-                      sx={{ 
-                        width: '100%', 
-                        height: '100%', 
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center', 
-                        justifyContent: 'center',
-                        backgroundColor: 'rgba(0, 0, 0, 0.2)'
-                      }}
-                    >
-                      <CircularProgress size={60} />
-                      <Typography variant="body1" sx={{ mt: 2 }}>
-                        Loading image...
-                      </Typography>
-                    </Box>
-                  ) : !imageUrl ? (
-                    <Box 
-                      sx={{ 
-                        width: '100%', 
-                        height: '100%', 
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center', 
-                        justifyContent: 'center',
-                        backgroundColor: 'rgba(0, 0, 0, 0.1)'
-                      }}
-                    >
-                      <ImageNotSupportedIcon sx={{ fontSize: 60, opacity: 0.7 }} />
-                      <Typography variant="body1" sx={{ mt: 2, opacity: 0.7 }}>
-                        No map image available
-                      </Typography>
-                    </Box>
-                  ) : (
-                    <Box
-                      sx={{
-                        position: 'relative',
-                        width: '100%',
-                        height: '100%',
-                        display: 'flex',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        overflow: 'hidden',
-                      }}
-                    >
-                      <img
-                        src={imageUrl}
-                        alt={selectedLocation.name}
-                        style={{
-                          maxWidth: '100%',
-                          maxHeight: '100%',
-                          objectFit: 'contain',
-                          position: 'relative',
-                          zIndex: 1,
-                        }}
-                        onLoad={() => setIsImageLoading(false)}
-                        onError={() => setIsImageLoading(false)}
-                      />
-                    </Box>
-                  )}
-                  {renderLocationMarkers()}
-                  {getDirectionalArrows()}
-                </Box>
-              </TransformComponent>
-              
-              {/* Zoom Controls */}
-              <Paper
-                elevation={3}
-                sx={{
-                  position: 'absolute',
-                  bottom: 20,
-                  right: 20,
-                  p: 2,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: 1.5,
-                  backgroundColor: 'rgba(30, 30, 30, 0.8)',
-                  zIndex: 10,
-                  width: 'auto',
-                  borderRadius: 2,
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
-                }}
-              >
-                <Typography variant="caption" sx={{ color: 'white', fontWeight: 'bold', mb: 0.5 }}>
-                  Map Controls
-                </Typography>
-                
-                <Box sx={{ display: 'flex', gap: 1 }}>
-                  <Tooltip title="Zoom In" arrow placement="top">
-                    <IconButton 
-                      onClick={() => zoomIn()} 
-                      size="small" 
-                      sx={{ 
-                        bgcolor: 'rgba(255,255,255,0.1)', 
-                        color: 'white',
-                        '&:hover': {
-                          bgcolor: 'rgba(255,255,255,0.2)',
-                        }
-                      }}
-                    >
-                      <AddIcon />
-                    </IconButton>
-                  </Tooltip>
-                  
-                  <Tooltip title="Zoom Out" arrow placement="top">
-                    <IconButton 
-                      onClick={() => zoomOut()} 
-                      size="small" 
-                      sx={{ 
-                        bgcolor: 'rgba(255,255,255,0.1)', 
-                        color: 'white',
-                        '&:hover': {
-                          bgcolor: 'rgba(255,255,255,0.2)',
-                        }
-                      }}
-                    >
-                      <RemoveIcon />
-                    </IconButton>
-                  </Tooltip>
-                  
-                  <Tooltip title="Reset View" arrow placement="top">
-                    <IconButton 
-                      onClick={() => resetTransform()} 
-                      size="small" 
-                      sx={{ 
-                        bgcolor: 'rgba(255,255,255,0.1)', 
-                        color: 'white',
-                        '&:hover': {
-                          bgcolor: 'rgba(255,255,255,0.2)',
-                        }
-                      }}
-                    >
-                      <RestartAltIcon />
-                    </IconButton>
-                  </Tooltip>
-                </Box>
-                
-                <Button 
-                  variant="outlined" 
-                  size="small" 
-                  sx={{ 
-                    mt: 1,
-                    color: 'white',
-                    borderColor: 'rgba(255,255,255,0.3)',
-                    '&:hover': {
-                      borderColor: 'white',
-                      bgcolor: 'rgba(255,255,255,0.1)',
-                    }
-                  }}
-                  onClick={() => setShowAssetManager(!showAssetManager)}
-                >
-                  {showAssetManager ? 'Hide Assets' : 'Manage Assets'}
-                </Button>
-              </Paper>
-            </>
-          )}
-        </TransformWrapper>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+            <EditIcon sx={{ mr: 1 }} />
+            <Typography variant="body1" fontWeight="bold">
+              Edit Mode
+            </Typography>
+          </Box>
+          <Typography variant="caption" sx={{ display: 'block', mb: 0.5 }}>
+            • Click on map to add new locations
+          </Typography>
+          <Typography variant="caption" sx={{ display: 'block', mb: 0.5 }}>
+            • Drag locations to reposition
+          </Typography>
+          <Typography variant="caption" sx={{ display: 'block' }}>
+            • Click on a location to edit its details
+          </Typography>
+          <Typography variant="caption" sx={{ mt: 1, fontStyle: 'italic', opacity: 0.8 }}>
+            Pan and zoom are disabled in edit mode
+          </Typography>
+        </Paper>
       )}
 
-      {/* Location Selection Panel */}
+      {/* Edit location dialog */}
+      <Dialog 
+        open={showEditDialog} 
+        onClose={() => setShowEditDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          Edit Location
+          <IconButton
+            aria-label="close"
+            onClick={() => setShowEditDialog(false)}
+            sx={{ position: 'absolute', right: 8, top: 8 }}
+          >
+            <CancelIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers>
+          {editingLocation && (
+            <Stack spacing={2}>
+              <TextField
+                label="Name"
+                fullWidth
+                value={editingLocation.name}
+                onChange={(e) => setEditingLocation({
+                  ...editingLocation,
+                  name: e.target.value
+                })}
+              />
+              <TextField
+                label="Description"
+                fullWidth
+                multiline
+                rows={4}
+                value={editingLocation.description}
+                onChange={(e) => setEditingLocation({
+                  ...editingLocation,
+                  description: e.target.value
+                })}
+              />
+              {editingLocation && editingLocation.coordinates && (
+                <Box sx={{ display: 'flex', gap: 2 }}>
+                  <TextField
+                    label="X Coordinate"
+                    type="number"
+                    InputProps={{ inputProps: { min: 0, max: 1, step: 0.01 } }}
+                    value={editingLocation.coordinates[0]}
+                    onChange={(e) => {
+                      if (editingLocation.coordinates) {
+                        const x = parseFloat(e.target.value);
+                        const y = editingLocation.coordinates[1];
+                        setEditingLocation({
+                          ...editingLocation,
+                          coordinates: [x, y]
+                        });
+                      }
+                    }}
+                  />
+                  <TextField
+                    label="Y Coordinate"
+                    type="number"
+                    InputProps={{ inputProps: { min: 0, max: 1, step: 0.01 } }}
+                    value={editingLocation.coordinates[1]}
+                    onChange={(e) => {
+                      if (editingLocation.coordinates) {
+                        const x = editingLocation.coordinates[0];
+                        const y = parseFloat(e.target.value);
+                        setEditingLocation({
+                          ...editingLocation,
+                          coordinates: [x, y]
+                        });
+                      }
+                    }}
+                  />
+                </Box>
+              )}
+              <FormControl fullWidth>
+                <InputLabel>Background Map Image</InputLabel>
+                <Select
+                  value={editingLocation.imageUrl || ''}
+                  label="Background Map Image"
+                  onChange={(e) => setEditingLocation({
+                    ...editingLocation,
+                    imageUrl: e.target.value || undefined
+                  })}
+                >
+                  <MenuItem value="">None</MenuItem>
+                  {imageAssets.map(asset => (
+                    <MenuItem key={asset} value={asset}>
+                      {asset}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <FormControl fullWidth>
+                <InputLabel>Background Music</InputLabel>
+                <Select
+                  value={editingLocation.backgroundMusic || ''}
+                  label="Background Music"
+                  onChange={(e) => setEditingLocation({
+                    ...editingLocation,
+                    backgroundMusic: e.target.value || undefined
+                  })}
+                >
+                  <MenuItem value="">None</MenuItem>
+                  {audioAssets.map(asset => (
+                    <MenuItem key={asset} value={asset}>
+                      {asset}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <FormControl fullWidth>
+                <InputLabel>Entry Sound</InputLabel>
+                <Select
+                  value={editingLocation.entrySound || ''}
+                  label="Entry Sound"
+                  onChange={(e) => setEditingLocation({
+                    ...editingLocation,
+                    entrySound: e.target.value || undefined
+                  })}
+                >
+                  <MenuItem value="">None</MenuItem>
+                  {audioAssets.map(asset => (
+                    <MenuItem key={asset} value={asset}>
+                      {asset}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={editingLocation.mixWithParent || false}
+                    onChange={(e) => setEditingLocation({
+                      ...editingLocation,
+                      mixWithParent: e.target.checked
+                    })}
+                  />
+                }
+                label="Mix audio with parent location"
+              />
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions>
+          {editingLocation && (
+            <Button 
+              color="error" 
+              startIcon={<DeleteIcon />}
+              onClick={() => {
+                if (window.confirm('Are you sure you want to delete this location? This cannot be undone.')) {
+                  const deleteLocation = useStore.getState().deleteLocation;
+                  deleteLocation(editingLocation.id);
+                  useStore.getState().saveDataToIndexedDB();
+                  setShowEditDialog(false);
+                  setEditingLocation(null);
+                }
+              }}
+            >
+              Delete
+            </Button>
+          )}
+          <Button onClick={() => setShowEditDialog(false)}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={() => {
+              if (editingLocation) {
+                const updateLocation = useStore.getState().updateLocation;
+                updateLocation(editingLocation.id, editingLocation);
+                useStore.getState().saveDataToIndexedDB();
+                setShowEditDialog(false);
+                setEditingLocation(null);
+              }
+            }} 
+            variant="contained"
+          >
+            Save
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Location sidebar drawer */}
       <Paper
         elevation={3}
         sx={{
@@ -863,7 +1036,10 @@ export const MapView: React.FC = () => {
               <CloseIcon />
             </IconButton>
           </Box>
-          <Typography variant="body1">
+          <Typography variant="h6" gutterBottom>
+            {selectedLocation.name}
+          </Typography>          
+          <Typography variant="body1" paragraph>
             {selectedLocation.description}
           </Typography>
           
@@ -899,6 +1075,120 @@ export const MapView: React.FC = () => {
       </Dialog>
 
       <AudioTrackPanel />
+
+      {/* Map container */}
+      <Box 
+        ref={mapContainerRef} 
+        sx={{ 
+          position: 'relative', 
+          height: '100%',
+          cursor: editMode ? 'crosshair' : 'default'
+        }}
+      >
+        {isLoading || isImageLoading ? (
+          <Box 
+            sx={{ 
+              width: '100%', 
+              height: '100%', 
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center', 
+              justifyContent: 'center',
+              backgroundColor: 'rgba(0, 0, 0, 0.2)'
+            }}
+          >
+            <CircularProgress size={60} />
+            <Typography variant="body1" sx={{ mt: 2 }}>
+              Loading map...
+            </Typography>
+          </Box>
+        ) : !imageUrl || !selectedLocation ? (
+          <Box 
+            sx={{ 
+              width: '100%', 
+              height: '100%', 
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center', 
+              justifyContent: 'center',
+              backgroundColor: 'rgba(0, 0, 0, 0.1)'
+            }}
+          >
+            <ImageNotSupportedIcon sx={{ fontSize: 60, opacity: 0.7 }} />
+            <Typography variant="body1" sx={{ mt: 2, opacity: 0.7 }}>
+              No map image available
+            </Typography>
+          </Box>
+        ) : (
+          <TransformWrapper
+            key="main-map"
+            initialScale={1}
+            initialPositionX={0}
+            initialPositionY={0}
+            minScale={0.5}
+            maxScale={5}
+            wheel={{ step: 0.1 }}
+            limitToBounds={false}
+            disablePadding={true}
+            // Disable pan and zoom when in edit mode
+            disabled={editMode}
+          >
+            {() => (
+              <>
+                <TransformComponent
+                  wrapperStyle={{
+                    width: '100%',
+                    height: '100%',
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    zIndex: 0,
+                  }}
+                  contentStyle={{
+                    width: '100%',
+                    height: '100%',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}
+                >
+                  <Box 
+                    sx={{
+                      position: 'relative',
+                      display: 'flex',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      width: '100%',
+                      height: '100%',
+                    }}
+                    onClick={editMode ? handleMapClick : undefined}
+                    onDragOver={editMode ? handleDragOver : undefined}
+                    onDrop={editMode ? handleDrop : undefined}
+                  >
+                    <img
+                      ref={imageRef}
+                      src={imageUrl}
+                      alt={selectedLocation?.name || 'Map'}
+                      style={{
+                        maxWidth: '100%',
+                        maxHeight: '100%',
+                        objectFit: 'contain',
+                        position: 'relative',
+                        zIndex: 1,
+                      }}
+                      onLoad={() => setIsImageLoading(false)}
+                      onError={() => setIsImageLoading(false)}
+                    />
+                    {renderLocationMarkers()}
+                    {getDirectionalArrows()}
+                  </Box>
+                </TransformComponent>
+                
+              </>
+            )}
+          </TransformWrapper>
+        )}
+      </Box>
     </Box>
   );
 }; 

@@ -31,7 +31,8 @@ import {
   Alert,
   Tooltip,
   InputAdornment,
-  Snackbar
+  Snackbar,
+  FormHelperText
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
@@ -42,6 +43,7 @@ import SaveIcon from '@mui/icons-material/Save';
 import MusicNoteIcon from '@mui/icons-material/MusicNote';
 import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import HelpIcon from '@mui/icons-material/Help';
+import ImageIcon from '@mui/icons-material/Image';
 import { useStore } from '../store';
 import { AssetManager } from '../services/assetManager';
 import { AudioTrackPanel } from '../components/AudioTrackPanel';
@@ -56,6 +58,7 @@ export const LocationsView: React.FC = () => {
     description: '',
     backgroundMusic: '',
     entrySound: '',
+    imageUrl: '',
     parentLocationId: '',
     coordinates: [0, 0] as [number, number],
     mixWithParent: false,
@@ -66,6 +69,9 @@ export const LocationsView: React.FC = () => {
   
   // Available audio files
   const [audioFiles, setAudioFiles] = useState<string[]>([]);
+  
+  // Available image files
+  const [imageFiles, setImageFiles] = useState<string[]>([]);
   
   // Status for save operation
   const [isSaving, setIsSaving] = useState(false);
@@ -87,16 +93,19 @@ export const LocationsView: React.FC = () => {
 
   // Load audio files on component mount
   useEffect(() => {
-    const loadAudioFiles = async () => {
+    const loadAssets = async () => {
       try {
-        const assets = await AssetManager.getAssets('audio');
-        setAudioFiles(assets.map(asset => asset.name));
+        const audioAssets = await AssetManager.getAssets('audio');
+        setAudioFiles(audioAssets.map(asset => asset.name));
+        
+        const imageAssets = await AssetManager.getAssets('images');
+        setImageFiles(imageAssets.map(asset => asset.name));
       } catch (error) {
-        console.error('Error loading audio files:', error);
+        console.error('Error loading assets:', error);
       }
     };
     
-    loadAudioFiles();
+    loadAssets();
   }, []);
 
   const handleAddLocation = () => {
@@ -105,6 +114,7 @@ export const LocationsView: React.FC = () => {
       description: newLocation.description,
       backgroundMusic: newLocation.backgroundMusic || undefined,
       entrySound: newLocation.entrySound || undefined,
+      imageUrl: newLocation.imageUrl || undefined,
       coordinates: newLocation.coordinates.every(coord => coord !== 0) ? newLocation.coordinates : undefined,
       parentLocationId: newLocation.parentLocationId || undefined,
       mixWithParent: newLocation.mixWithParent,
@@ -121,6 +131,7 @@ export const LocationsView: React.FC = () => {
       description: '', 
       backgroundMusic: '', 
       entrySound: '',
+      imageUrl: '',
       parentLocationId: '',
       coordinates: [0, 0],
       mixWithParent: false
@@ -144,6 +155,7 @@ export const LocationsView: React.FC = () => {
         description: location.description,
         backgroundMusic: location.backgroundMusic || '',
         entrySound: location.entrySound || '',
+        imageUrl: location.imageUrl || '',
         parentLocationId: location.parentLocationId || '',
         coordinates: location.coordinates || [0, 0],
         mixWithParent: location.mixWithParent || false,
@@ -160,6 +172,7 @@ export const LocationsView: React.FC = () => {
         description: newLocation.description,
         backgroundMusic: newLocation.backgroundMusic || undefined,
         entrySound: newLocation.entrySound || undefined,
+        imageUrl: newLocation.imageUrl || undefined,
         coordinates: newLocation.coordinates.every(coord => coord !== 0) ? newLocation.coordinates : undefined,
         parentLocationId: newLocation.parentLocationId || undefined,
         mixWithParent: newLocation.mixWithParent,
@@ -219,6 +232,47 @@ export const LocationsView: React.FC = () => {
                 <Typography variant="h6" component="div">
                   {location.name}
                 </Typography>
+                
+                {location.imageUrl && (
+                  <Box sx={{ 
+                    mt: 1, 
+                    mb: 2, 
+                    display: 'flex', 
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    height: 140,
+                    overflow: 'hidden',
+                    borderRadius: 1,
+                    border: '1px solid #ddd'
+                  }}>
+                    <Typography variant="caption" sx={{ mt: 0.5, color: 'text.secondary', fontStyle: 'italic' }}>
+                      Map Background:
+                    </Typography>
+                    <Box sx={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%' }}>
+                      <img 
+                        src={`/images/${location.imageUrl}`}
+                        alt={`Map of ${location.name}`}
+                        style={{ 
+                          maxWidth: '100%', 
+                          maxHeight: '100%',
+                          objectFit: 'contain' 
+                        }}
+                        onError={async (e) => {
+                          try {
+                            if (location.imageUrl) {
+                              const imageUrl = await AssetManager.getAssetUrl('images', location.imageUrl);
+                              if (imageUrl) {
+                                (e.target as HTMLImageElement).src = imageUrl;
+                              }
+                            }
+                          } catch (error) {
+                            console.error('Error loading location image:', error);
+                          }
+                        }}
+                      />
+                    </Box>
+                  </Box>
+                )}
                 
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                   {location.description}
@@ -406,12 +460,10 @@ export const LocationsView: React.FC = () => {
                 <Select
                   value={newLocation.backgroundMusic}
                   label="Background Music"
-                  onChange={(e) => setNewLocation({ ...newLocation, backgroundMusic: e.target.value as string })}
+                  onChange={(e) => setNewLocation({ ...newLocation, backgroundMusic: e.target.value })}
                 >
-                  <MenuItem value="">
-                    <em>None</em>
-                  </MenuItem>
-                  {audioFiles.map((file) => (
+                  <MenuItem value="">None</MenuItem>
+                  {audioFiles.map(file => (
                     <MenuItem key={file} value={file}>{file}</MenuItem>
                   ))}
                 </Select>
@@ -424,15 +476,30 @@ export const LocationsView: React.FC = () => {
                 <Select
                   value={newLocation.entrySound}
                   label="Entry Sound"
-                  onChange={(e) => setNewLocation({ ...newLocation, entrySound: e.target.value as string })}
+                  onChange={(e) => setNewLocation({ ...newLocation, entrySound: e.target.value })}
                 >
-                  <MenuItem value="">
-                    <em>None</em>
-                  </MenuItem>
-                  {audioFiles.map((file) => (
+                  <MenuItem value="">None</MenuItem>
+                  {audioFiles.map(file => (
                     <MenuItem key={file} value={file}>{file}</MenuItem>
                   ))}
                 </Select>
+              </FormControl>
+            </Grid>
+            
+            <Grid item xs={12} md={6}>
+              <FormControl fullWidth>
+                <InputLabel>Background Map Image</InputLabel>
+                <Select
+                  value={newLocation.imageUrl}
+                  label="Background Map Image"
+                  onChange={(e) => setNewLocation({ ...newLocation, imageUrl: e.target.value })}
+                >
+                  <MenuItem value="">None</MenuItem>
+                  {imageFiles.map(file => (
+                    <MenuItem key={file} value={file}>{file}</MenuItem>
+                  ))}
+                </Select>
+                <FormHelperText>Image to use as the background map for this location</FormHelperText>
               </FormControl>
             </Grid>
             
@@ -550,12 +617,10 @@ export const LocationsView: React.FC = () => {
                 <Select
                   value={newLocation.backgroundMusic}
                   label="Background Music"
-                  onChange={(e) => setNewLocation({ ...newLocation, backgroundMusic: e.target.value as string })}
+                  onChange={(e) => setNewLocation({ ...newLocation, backgroundMusic: e.target.value })}
                 >
-                  <MenuItem value="">
-                    <em>None</em>
-                  </MenuItem>
-                  {audioFiles.map((file) => (
+                  <MenuItem value="">None</MenuItem>
+                  {audioFiles.map(file => (
                     <MenuItem key={file} value={file}>{file}</MenuItem>
                   ))}
                 </Select>
@@ -568,15 +633,30 @@ export const LocationsView: React.FC = () => {
                 <Select
                   value={newLocation.entrySound}
                   label="Entry Sound"
-                  onChange={(e) => setNewLocation({ ...newLocation, entrySound: e.target.value as string })}
+                  onChange={(e) => setNewLocation({ ...newLocation, entrySound: e.target.value })}
                 >
-                  <MenuItem value="">
-                    <em>None</em>
-                  </MenuItem>
-                  {audioFiles.map((file) => (
+                  <MenuItem value="">None</MenuItem>
+                  {audioFiles.map(file => (
                     <MenuItem key={file} value={file}>{file}</MenuItem>
                   ))}
                 </Select>
+              </FormControl>
+            </Grid>
+            
+            <Grid item xs={12} md={6}>
+              <FormControl fullWidth>
+                <InputLabel>Background Map Image</InputLabel>
+                <Select
+                  value={newLocation.imageUrl}
+                  label="Background Map Image"
+                  onChange={(e) => setNewLocation({ ...newLocation, imageUrl: e.target.value })}
+                >
+                  <MenuItem value="">None</MenuItem>
+                  {imageFiles.map(file => (
+                    <MenuItem key={file} value={file}>{file}</MenuItem>
+                  ))}
+                </Select>
+                <FormHelperText>Image to use as the background map for this location</FormHelperText>
               </FormControl>
             </Grid>
             

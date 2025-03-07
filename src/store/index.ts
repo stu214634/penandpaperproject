@@ -23,6 +23,7 @@ export interface CustomLocation {
   description: string;
   backgroundMusic?: string;
   entrySound?: string;
+  imageUrl?: string;
   mixWithParent?: boolean;
   coordinates?: [number, number];
   inventory?: Item[];
