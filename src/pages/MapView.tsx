@@ -39,7 +39,8 @@ import {
   Drawer,
   Tabs,
   Tab,
-  Chip
+  Chip,
+  Autocomplete
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import AddIcon from '@mui/icons-material/Add';
@@ -347,8 +348,8 @@ export const MapView: React.FC = () => {
     const y = (e.clientY - rect.top) / rect.height;
     
     // Update location coordinates
-    const updateLocation = useStore.getState().updateLocation;
-    updateLocation(locationId, { coordinates: [x, y] });
+    const updateLocationFn = useStore.getState().updateLocation;
+    updateLocationFn(locationId, { coordinates: [x, y] });
     
     // Save to IndexedDB
     useStore.getState().saveDataToIndexedDB();
@@ -1639,7 +1640,37 @@ export const MapView: React.FC = () => {
                   description: e.target.value
                 })}
               />
-              {editingLocation && editingLocation.coordinates && (
+              
+              <Autocomplete
+                multiple
+                options={locations.filter(loc => loc.id !== editingLocation.id)}
+                value={locations.filter(loc => editingLocation.connectedLocations?.includes(loc.id) || false)}
+                onChange={(_, newValue) => setEditingLocation({
+                  ...editingLocation,
+                  connectedLocations: newValue.map(item => item.id)
+                })}
+                getOptionLabel={(option) => option.name}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Connected Locations"
+                    fullWidth
+                    helperText="Select locations that are connected to this one"
+                  />
+                )}
+                isOptionEqualToValue={(option, value) => option.id === value.id}
+                renderTags={(value, getTagProps) =>
+                  value.map((option, index) => (
+                    <Chip
+                      label={option.name}
+                      {...getTagProps({ index })}
+                      key={option.id}
+                    />
+                  ))
+                }
+              />
+              
+              {editingLocation.coordinates && (
                 <Box sx={{ display: 'flex', gap: 2 }}>
                   <TextField
                     label="X Coordinate"
@@ -1675,107 +1706,27 @@ export const MapView: React.FC = () => {
                   />
                 </Box>
               )}
-              <FormControl fullWidth>
-                <InputLabel>Background Map Image</InputLabel>
-                <Select
-                  value={editingLocation.imageUrl || ''}
-                  label="Background Map Image"
-                  onChange={(e) => setEditingLocation({
-                    ...editingLocation,
-                    imageUrl: e.target.value || undefined
-                  })}
-                >
-                  <MenuItem value="">None</MenuItem>
-                  {imageAssets.map(asset => (
-                    <MenuItem key={asset} value={asset}>
-                      {asset}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <FormControl fullWidth>
-                <InputLabel>Background Music</InputLabel>
-                <Select
-                  value={editingLocation.backgroundMusic || ''}
-                  label="Background Music"
-                  onChange={(e) => setEditingLocation({
-                    ...editingLocation,
-                    backgroundMusic: e.target.value || undefined
-                  })}
-                >
-                  <MenuItem value="">None</MenuItem>
-                  {audioAssets.map(asset => (
-                    <MenuItem key={asset} value={asset}>
-                      {asset}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <FormControl fullWidth>
-                <InputLabel>Entry Sound</InputLabel>
-                <Select
-                  value={editingLocation.entrySound || ''}
-                  label="Entry Sound"
-                  onChange={(e) => setEditingLocation({
-                    ...editingLocation,
-                    entrySound: e.target.value || undefined
-                  })}
-                >
-                  <MenuItem value="">None</MenuItem>
-                  {audioAssets.map(asset => (
-                    <MenuItem key={asset} value={asset}>
-                      {asset}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={editingLocation.mixWithParent || false}
-                    onChange={(e) => setEditingLocation({
-                      ...editingLocation,
-                      mixWithParent: e.target.checked
-                    })}
-                  />
-                }
-                label="Mix audio with parent location"
-              />
             </Stack>
           )}
         </DialogContent>
         <DialogActions>
-          {editingLocation && (
-            <Button 
-              color="error" 
-              startIcon={<DeleteIcon />}
-              onClick={() => {
-                if (window.confirm('Are you sure you want to delete this location? This cannot be undone.')) {
-                  const deleteLocation = useStore.getState().deleteLocation;
-                  deleteLocation(editingLocation.id);
-                  useStore.getState().saveDataToIndexedDB();
-                  setShowEditDialog(false);
-                  setEditingLocation(null);
-                }
-              }}
-            >
-              Delete
-            </Button>
-          )}
-          <Button onClick={() => setShowEditDialog(false)}>
-            Cancel
-          </Button>
+          <Button onClick={() => setShowEditDialog(false)}>Cancel</Button>
           <Button 
             onClick={() => {
               if (editingLocation) {
-                const updateLocation = useStore.getState().updateLocation;
-                updateLocation(editingLocation.id, editingLocation);
+                const updateLocationFn = useStore.getState().updateLocation;
+                updateLocationFn(editingLocation.id, {
+                  name: editingLocation.name,
+                  description: editingLocation.description,
+                  coordinates: editingLocation.coordinates,
+                  connectedLocations: editingLocation.connectedLocations
+                });
                 useStore.getState().saveDataToIndexedDB();
                 setShowEditDialog(false);
-                setEditingLocation(null);
               }
             }} 
-            variant="contained"
+            variant="contained" 
+            color="primary"
           >
             Save
           </Button>

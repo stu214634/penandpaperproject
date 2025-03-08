@@ -32,7 +32,8 @@ import {
   Tooltip,
   InputAdornment,
   Snackbar,
-  FormHelperText
+  FormHelperText,
+  Autocomplete
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
@@ -63,6 +64,7 @@ export const LocationsView: React.FC = () => {
     parentLocationId: '',
     coordinates: [0, 0] as [number, number],
     mixWithParent: false,
+    connectedLocations: [] as string[]
   });
   
   // Currently edited location
@@ -123,6 +125,7 @@ export const LocationsView: React.FC = () => {
       coordinates: newLocation.coordinates.every(coord => coord !== 0) ? newLocation.coordinates : undefined,
       parentLocationId: newLocation.parentLocationId || undefined,
       mixWithParent: newLocation.mixWithParent,
+      connectedLocations: newLocation.connectedLocations.length > 0 ? newLocation.connectedLocations : undefined
     });
     
     setIsAddDialogOpen(false);
@@ -131,15 +134,16 @@ export const LocationsView: React.FC = () => {
   };
   
   const resetNewLocationForm = () => {
-    setNewLocation({ 
-      name: '', 
-      description: '', 
-      backgroundMusic: '', 
+    setNewLocation({
+      name: '',
+      description: '',
+      backgroundMusic: '',
       entrySound: '',
       imageUrl: '',
       parentLocationId: '',
       coordinates: [0, 0],
-      mixWithParent: false
+      mixWithParent: false,
+      connectedLocations: []
     });
   };
 
@@ -164,6 +168,7 @@ export const LocationsView: React.FC = () => {
         parentLocationId: location.parentLocationId || '',
         coordinates: location.coordinates || [0, 0],
         mixWithParent: location.mixWithParent || false,
+        connectedLocations: location.connectedLocations || []
       });
       setIsEditDialogOpen(true);
     }
@@ -181,6 +186,7 @@ export const LocationsView: React.FC = () => {
         coordinates: newLocation.coordinates.every(coord => coord !== 0) ? newLocation.coordinates : undefined,
         parentLocationId: newLocation.parentLocationId || undefined,
         mixWithParent: newLocation.mixWithParent,
+        connectedLocations: newLocation.connectedLocations.length > 0 ? newLocation.connectedLocations : undefined
       });
       
       setIsEditDialogOpen(false);
@@ -354,6 +360,22 @@ export const LocationsView: React.FC = () => {
                       variant="outlined" 
                     />
                   )}
+                  
+                  {location.connectedLocations && location.connectedLocations.length > 0 && (
+                    <Chip 
+                      label={`${location.connectedLocations.length} Connected Locations`}
+                      size="small"
+                      color="success"
+                      variant="outlined"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const connectedNames = location.connectedLocations
+                          .map((id: string) => locations.find(loc => loc.id === id)?.name || 'Unknown')
+                          .join(', ');
+                        alert(`Connected to: ${connectedNames}`);
+                      }}
+                    />
+                  )}
                 </Box>
               </Box>
               
@@ -467,21 +489,23 @@ export const LocationsView: React.FC = () => {
             </Grid>
             
             <Grid item xs={12} md={6}>
-              <FormControl fullWidth>
-                <InputLabel>Parent Location</InputLabel>
-                <Select
-                  value={newLocation.parentLocationId}
-                  label="Parent Location"
-                  onChange={(e) => setNewLocation({ ...newLocation, parentLocationId: e.target.value as string })}
-                >
-                  <MenuItem value="">
-                    <em>None (Top-level)</em>
-                  </MenuItem>
-                  {locations.map((loc) => (
-                    <MenuItem key={loc.id} value={loc.id}>{loc.name}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+              <Autocomplete
+                options={locations}
+                value={locations.find(loc => loc.id === newLocation.parentLocationId) || null}
+                onChange={(_, newValue) => setNewLocation({ 
+                  ...newLocation, 
+                  parentLocationId: newValue?.id || '' 
+                })}
+                getOptionLabel={(option) => option.name}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Parent Location"
+                    fullWidth
+                  />
+                )}
+                isOptionEqualToValue={(option, value) => option.id === value.id}
+              />
             </Grid>
             
             <Grid item xs={12}>
@@ -494,86 +518,128 @@ export const LocationsView: React.FC = () => {
                 onChange={(e) => setNewLocation({ ...newLocation, description: e.target.value })}
               />
             </Grid>
-            
-            <Grid item xs={12} md={6}>
-              <FormControl fullWidth>
-                <InputLabel>Background Music</InputLabel>
-                <Select
-                  value={newLocation.backgroundMusic}
-                  label="Background Music"
-                  onChange={(e) => setNewLocation({ ...newLocation, backgroundMusic: e.target.value })}
-                >
-                  <MenuItem value="">None</MenuItem>
-                  {audioFiles.map(file => (
-                    <MenuItem key={file} value={file}>{file}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            
-            <Grid item xs={12} md={6}>
-              <FormControl fullWidth>
-                <InputLabel>Entry Sound</InputLabel>
-                <Select
-                  value={newLocation.entrySound}
-                  label="Entry Sound"
-                  onChange={(e) => setNewLocation({ ...newLocation, entrySound: e.target.value })}
-                >
-                  <MenuItem value="">None</MenuItem>
-                  {audioFiles.map(file => (
-                    <MenuItem key={file} value={file}>{file}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            
-            <Grid item xs={12} md={6}>
-              <FormControl fullWidth>
-                <InputLabel>Background Map Image</InputLabel>
-                <Select
-                  value={newLocation.imageUrl}
-                  label="Background Map Image"
-                  onChange={(e) => setNewLocation({ ...newLocation, imageUrl: e.target.value })}
-                >
-                  <MenuItem value="">None</MenuItem>
-                  {imageFiles.map(file => (
-                    <MenuItem key={file} value={file}>{file}</MenuItem>
-                  ))}
-                </Select>
-                <FormHelperText>Image to use as the background map for this location</FormHelperText>
-              </FormControl>
-            </Grid>
-            
-            <Grid item xs={12} md={6}>
-              <TextField
-                label="X Coordinate"
-                type="number"
-                fullWidth
-                value={newLocation.coordinates[0]}
-                onChange={(e) => setNewLocation({ 
+
+            <Grid item xs={12}>
+              <Autocomplete
+                multiple
+                options={locations.filter(loc => loc.id !== newLocation.parentLocationId)}
+                value={locations.filter(loc => newLocation.connectedLocations.includes(loc.id))}
+                onChange={(_, newValue) => setNewLocation({ 
                   ...newLocation, 
-                  coordinates: [parseFloat(e.target.value) || 0, newLocation.coordinates[1]] 
+                  connectedLocations: newValue.map(item => item.id) 
                 })}
-                InputProps={{
-                  startAdornment: <InputAdornment position="start">X:</InputAdornment>,
-                }}
+                getOptionLabel={(option) => option.name}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Connected Locations"
+                    fullWidth
+                    helperText="Select locations that are connected to this one"
+                  />
+                )}
+                isOptionEqualToValue={(option, value) => option.id === value.id}
+                renderTags={(value, getTagProps) =>
+                  value.map((option, index) => (
+                    <Chip
+                      label={option.name}
+                      {...getTagProps({ index })}
+                      key={option.id}
+                    />
+                  ))
+                }
               />
             </Grid>
             
             <Grid item xs={12} md={6}>
-              <TextField
-                label="Y Coordinate"
-                type="number"
-                fullWidth
-                value={newLocation.coordinates[1]}
-                onChange={(e) => setNewLocation({ 
+              <Autocomplete
+                options={audioFiles}
+                value={newLocation.backgroundMusic}
+                onChange={(_, newValue) => setNewLocation({ 
                   ...newLocation, 
-                  coordinates: [newLocation.coordinates[0], parseFloat(e.target.value) || 0] 
+                  backgroundMusic: newValue || '' 
                 })}
-                InputProps={{
-                  startAdornment: <InputAdornment position="start">Y:</InputAdornment>,
-                }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Background Music"
+                    fullWidth
+                  />
+                )}
+                freeSolo
               />
+            </Grid>
+            
+            <Grid item xs={12} md={6}>
+              <Autocomplete
+                options={audioFiles}
+                value={newLocation.entrySound}
+                onChange={(_, newValue) => setNewLocation({ 
+                  ...newLocation, 
+                  entrySound: newValue || '' 
+                })}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Entry Sound"
+                    fullWidth
+                  />
+                )}
+                freeSolo
+              />
+            </Grid>
+            
+            <Grid item xs={12} md={6}>
+              <Autocomplete
+                options={imageFiles}
+                value={newLocation.imageUrl}
+                onChange={(_, newValue) => setNewLocation({ 
+                  ...newLocation, 
+                  imageUrl: newValue || '' 
+                })}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Background Image"
+                    fullWidth
+                  />
+                )}
+                freeSolo
+              />
+            </Grid>
+            
+            <Grid item xs={12} md={6}>
+              <Grid container spacing={1}>
+                <Grid item xs={6}>
+                  <TextField
+                    label="X Coordinate"
+                    type="number"
+                    fullWidth
+                    value={newLocation.coordinates[0]}
+                    onChange={(e) => setNewLocation({
+                      ...newLocation,
+                      coordinates: [parseFloat(e.target.value), newLocation.coordinates[1]]
+                    })}
+                    InputProps={{
+                      inputProps: { min: 0, max: 1, step: 0.01 }
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={6}>
+                  <TextField
+                    label="Y Coordinate"
+                    type="number"
+                    fullWidth
+                    value={newLocation.coordinates[1]}
+                    onChange={(e) => setNewLocation({
+                      ...newLocation,
+                      coordinates: [newLocation.coordinates[0], parseFloat(e.target.value)]
+                    })}
+                    InputProps={{
+                      inputProps: { min: 0, max: 1, step: 0.01 }
+                    }}
+                  />
+                </Grid>
+              </Grid>
             </Grid>
             
             <Grid item xs={12}>
@@ -621,24 +687,23 @@ export const LocationsView: React.FC = () => {
             </Grid>
             
             <Grid item xs={12} md={6}>
-              <FormControl fullWidth>
-                <InputLabel>Parent Location</InputLabel>
-                <Select
-                  value={newLocation.parentLocationId}
-                  label="Parent Location"
-                  onChange={(e) => setNewLocation({ ...newLocation, parentLocationId: e.target.value as string })}
-                >
-                  <MenuItem value="">
-                    <em>None (Top-level)</em>
-                  </MenuItem>
-                  {locations
-                    .filter(loc => loc.id !== editingLocation) // Prevent selecting itself
-                    .map((loc) => (
-                      <MenuItem key={loc.id} value={loc.id}>{loc.name}</MenuItem>
-                    ))
-                  }
-                </Select>
-              </FormControl>
+              <Autocomplete
+                options={locations.filter(loc => loc.id !== editingLocation)}
+                value={locations.find(loc => loc.id === newLocation.parentLocationId) || null}
+                onChange={(_, newValue) => setNewLocation({ 
+                  ...newLocation, 
+                  parentLocationId: newValue?.id || '' 
+                })}
+                getOptionLabel={(option) => option.name}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Parent Location"
+                    fullWidth
+                  />
+                )}
+                isOptionEqualToValue={(option, value) => option.id === value.id}
+              />
             </Grid>
             
             <Grid item xs={12}>
@@ -651,86 +716,128 @@ export const LocationsView: React.FC = () => {
                 onChange={(e) => setNewLocation({ ...newLocation, description: e.target.value })}
               />
             </Grid>
-            
-            <Grid item xs={12} md={6}>
-              <FormControl fullWidth>
-                <InputLabel>Background Music</InputLabel>
-                <Select
-                  value={newLocation.backgroundMusic}
-                  label="Background Music"
-                  onChange={(e) => setNewLocation({ ...newLocation, backgroundMusic: e.target.value })}
-                >
-                  <MenuItem value="">None</MenuItem>
-                  {audioFiles.map(file => (
-                    <MenuItem key={file} value={file}>{file}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            
-            <Grid item xs={12} md={6}>
-              <FormControl fullWidth>
-                <InputLabel>Entry Sound</InputLabel>
-                <Select
-                  value={newLocation.entrySound}
-                  label="Entry Sound"
-                  onChange={(e) => setNewLocation({ ...newLocation, entrySound: e.target.value })}
-                >
-                  <MenuItem value="">None</MenuItem>
-                  {audioFiles.map(file => (
-                    <MenuItem key={file} value={file}>{file}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            
-            <Grid item xs={12} md={6}>
-              <FormControl fullWidth>
-                <InputLabel>Background Map Image</InputLabel>
-                <Select
-                  value={newLocation.imageUrl}
-                  label="Background Map Image"
-                  onChange={(e) => setNewLocation({ ...newLocation, imageUrl: e.target.value })}
-                >
-                  <MenuItem value="">None</MenuItem>
-                  {imageFiles.map(file => (
-                    <MenuItem key={file} value={file}>{file}</MenuItem>
-                  ))}
-                </Select>
-                <FormHelperText>Image to use as the background map for this location</FormHelperText>
-              </FormControl>
-            </Grid>
-            
-            <Grid item xs={12} md={6}>
-              <TextField
-                label="X Coordinate"
-                type="number"
-                fullWidth
-                value={newLocation.coordinates[0]}
-                onChange={(e) => setNewLocation({ 
+
+            <Grid item xs={12}>
+              <Autocomplete
+                multiple
+                options={locations.filter(loc => loc.id !== editingLocation && loc.id !== newLocation.parentLocationId)}
+                value={locations.filter(loc => newLocation.connectedLocations.includes(loc.id))}
+                onChange={(_, newValue) => setNewLocation({ 
                   ...newLocation, 
-                  coordinates: [parseFloat(e.target.value) || 0, newLocation.coordinates[1]] 
+                  connectedLocations: newValue.map(item => item.id) 
                 })}
-                InputProps={{
-                  startAdornment: <InputAdornment position="start">X:</InputAdornment>,
-                }}
+                getOptionLabel={(option) => option.name}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Connected Locations"
+                    fullWidth
+                    helperText="Select locations that are connected to this one"
+                  />
+                )}
+                isOptionEqualToValue={(option, value) => option.id === value.id}
+                renderTags={(value, getTagProps) =>
+                  value.map((option, index) => (
+                    <Chip
+                      label={option.name}
+                      {...getTagProps({ index })}
+                      key={option.id}
+                    />
+                  ))
+                }
               />
             </Grid>
             
             <Grid item xs={12} md={6}>
-              <TextField
-                label="Y Coordinate"
-                type="number"
-                fullWidth
-                value={newLocation.coordinates[1]}
-                onChange={(e) => setNewLocation({ 
+              <Autocomplete
+                options={audioFiles}
+                value={newLocation.backgroundMusic}
+                onChange={(_, newValue) => setNewLocation({ 
                   ...newLocation, 
-                  coordinates: [newLocation.coordinates[0], parseFloat(e.target.value) || 0] 
+                  backgroundMusic: newValue || '' 
                 })}
-                InputProps={{
-                  startAdornment: <InputAdornment position="start">Y:</InputAdornment>,
-                }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Background Music"
+                    fullWidth
+                  />
+                )}
+                freeSolo
               />
+            </Grid>
+            
+            <Grid item xs={12} md={6}>
+              <Autocomplete
+                options={audioFiles}
+                value={newLocation.entrySound}
+                onChange={(_, newValue) => setNewLocation({ 
+                  ...newLocation, 
+                  entrySound: newValue || '' 
+                })}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Entry Sound"
+                    fullWidth
+                  />
+                )}
+                freeSolo
+              />
+            </Grid>
+            
+            <Grid item xs={12} md={6}>
+              <Autocomplete
+                options={imageFiles}
+                value={newLocation.imageUrl}
+                onChange={(_, newValue) => setNewLocation({ 
+                  ...newLocation, 
+                  imageUrl: newValue || '' 
+                })}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Background Image"
+                    fullWidth
+                  />
+                )}
+                freeSolo
+              />
+            </Grid>
+            
+            <Grid item xs={12} md={6}>
+              <Grid container spacing={1}>
+                <Grid item xs={6}>
+                  <TextField
+                    label="X Coordinate"
+                    type="number"
+                    fullWidth
+                    value={newLocation.coordinates[0]}
+                    onChange={(e) => setNewLocation({
+                      ...newLocation,
+                      coordinates: [parseFloat(e.target.value), newLocation.coordinates[1]]
+                    })}
+                    InputProps={{
+                      inputProps: { min: 0, max: 1, step: 0.01 }
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={6}>
+                  <TextField
+                    label="Y Coordinate"
+                    type="number"
+                    fullWidth
+                    value={newLocation.coordinates[1]}
+                    onChange={(e) => setNewLocation({
+                      ...newLocation,
+                      coordinates: [newLocation.coordinates[0], parseFloat(e.target.value)]
+                    })}
+                    InputProps={{
+                      inputProps: { min: 0, max: 1, step: 0.01 }
+                    }}
+                  />
+                </Grid>
+              </Grid>
             </Grid>
             
             <Grid item xs={12}>
