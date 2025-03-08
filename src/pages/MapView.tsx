@@ -46,13 +46,14 @@ import RemoveIcon from '@mui/icons-material/Remove';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { useStore } from '../store';
-import { CustomLocation } from '../store';
+import { CustomLocation, Character, Item, Combat } from '../store';
 import NorthIcon from '@mui/icons-material/North';
 import { Howl } from 'howler';
 import { AudioTrackPanel } from '../components/AudioTrackPanel';
 import { AssetDropZone } from '../components/AssetDropZone';
 import { AssetManager } from '../services/assetManager';
 import ImageNotSupportedIcon from '@mui/icons-material/ImageNotSupported';
+import SportsKabaddiIcon from '@mui/icons-material/SportsKabaddi';
 import { 
   PlaceOutlined as PlaceIcon,
   ArrowUpward as ArrowUpwardIcon,
@@ -67,8 +68,10 @@ import {
   Person as PersonIcon,
   Store as MerchantIcon,
   ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon
+  ExpandLess as ExpandLessIcon,
+  PlayArrow as PlayArrowIcon
 } from '@mui/icons-material';
+import { CombatSessionView } from '../components/CombatSessionView';
 
 export const MapView: React.FC = () => {
   const locations = useStore((state) => state.locations);
@@ -80,6 +83,7 @@ export const MapView: React.FC = () => {
   const hasAssets = useStore((state) => state.hasAssets);
   const isLoading = useStore((state) => state.isLoading);
   const characters = useStore((state) => state.characters);
+  const combats = useStore((state) => state.combats);
   const saveDataToIndexedDB = useStore((state) => state.saveDataToIndexedDB);
   
   // Get only the selected location ID from the store
@@ -117,6 +121,18 @@ export const MapView: React.FC = () => {
   
   // State for expanded NPC sections
   const [expandedNpcSections, setExpandedNpcSections] = useState<{[key: string]: boolean}>({});
+  
+  // State for selected NPC and its details panel
+  const [selectedNpc, setSelectedNpc] = useState<Character | null>(null);
+  const [showNpcDetails, setShowNpcDetails] = useState(false);
+  
+  // State for selected Combat and its details panel
+  const [selectedCombat, setSelectedCombat] = useState<Combat | null>(null);
+  const [showCombatDetails, setShowCombatDetails] = useState(false);
+  
+  // State for active combat session
+  const [activeCombat, setActiveCombat] = useState<Combat | null>(null);
+  const [showCombatSession, setShowCombatSession] = useState(false);
   
   // Additional state for the UI
   const [detailsTab, setDetailsTab] = useState(0);
@@ -615,10 +631,10 @@ export const MapView: React.FC = () => {
   };
   
   // Toggle expanded state for NPC sections
-  const toggleNpcSection = (locationId: string) => {
+  const toggleNpcSection = (sectionId: string) => {
     setExpandedNpcSections(prev => ({
       ...prev,
-      [locationId]: !prev[locationId]
+      [sectionId]: !prev[sectionId]
     }));
   };
   
@@ -643,7 +659,14 @@ export const MapView: React.FC = () => {
     return allCharacters;
   };
   
-  // Render the NPCs panel for the selected location
+  // Handle clicking on an NPC to show its details
+  const handleNpcClick = (npc: Character, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedNpc(npc);
+    setShowNpcDetails(true);
+  };
+  
+  // Modify the renderNpcsPanel function to include click handlers
   const renderNpcsPanel = () => {
     if (!selectedLocation) return null;
     
@@ -673,9 +696,16 @@ export const MapView: React.FC = () => {
                 />
               </ListItem>
               {directNpcs.map(npc => (
-                <ListItem key={npc.id}>
+                <ListItem 
+                  key={npc.id} 
+                  button 
+                  onClick={(e) => handleNpcClick(npc, e)}
+                  sx={{ cursor: 'pointer' }}
+                >
                   <ListItemIcon>
-                    {npc.type === 'npc' ? <PersonIcon fontSize="small" /> : <MerchantIcon fontSize="small" />}
+                    {npc.type === 'npc' ? <PersonIcon fontSize="small" /> : 
+                     npc.type === 'merchant' ? <MerchantIcon fontSize="small" /> :
+                     <SportsKabaddiIcon color="error" fontSize="small" />}
                   </ListItemIcon>
                   <ListItemText primary={npc.name} secondary={npc.description} />
                 </ListItem>
@@ -690,7 +720,7 @@ export const MapView: React.FC = () => {
     );
   };
   
-  // Recursively render NPCs in sublocations
+  // Modify the renderSublocationsNpcs function to include click handlers
   const renderSublocationsNpcs = (locationId: string) => {
     const sublocations = getSublocationsByParentId(locationId);
     
@@ -698,42 +728,464 @@ export const MapView: React.FC = () => {
       <>
         {sublocations.map(sublocation => {
           const npcs = getCharactersByLocationId(sublocation.id);
-          if (npcs.length === 0) return null;
           
-          const isExpanded = expandedNpcSections[sublocation.id] || false;
+          if (npcs.length === 0) {
+            return null;
+          }
+          
+          const sectionId = `npc-section-${sublocation.id}`;
+          const isExpanded = expandedNpcSections[sectionId] || false;
           
           return (
-            <React.Fragment key={sublocation.id}>
+            <Box key={sublocation.id}>
               <ListItem 
                 button 
-                onClick={() => toggleNpcSection(sublocation.id)}
-                sx={{ bgcolor: 'background.default' }}
+                onClick={() => toggleNpcSection(sectionId)}
+                sx={{ pl: 2 }}
               >
-                <ListItemIcon>
-                  <PlaceIcon fontSize="small" />
-                </ListItemIcon>
-                <ListItemText primary={`NPCs in ${sublocation.name}`} />
+                <ListItemText 
+                  primary={sublocation.name} 
+                  primaryTypographyProps={{ variant: 'subtitle2' }}
+                />
                 {isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
               </ListItem>
               
               <Collapse in={isExpanded} timeout="auto" unmountOnExit>
-                <List dense component="div" disablePadding>
+                <List component="div" disablePadding>
                   {npcs.map(npc => (
-                    <ListItem key={npc.id} sx={{ pl: 4 }}>
+                    <ListItem 
+                      key={npc.id}
+                      button
+                      onClick={(e) => handleNpcClick(npc, e)}
+                      sx={{ pl: 4, cursor: 'pointer' }}
+                    >
                       <ListItemIcon>
-                        {npc.type === 'npc' ? <PersonIcon fontSize="small" /> : <MerchantIcon fontSize="small" />}
+                        {npc.type === 'npc' ? <PersonIcon fontSize="small" /> : 
+                         npc.type === 'merchant' ? <MerchantIcon fontSize="small" /> :
+                         <SportsKabaddiIcon color="error" fontSize="small" />}
                       </ListItemIcon>
-                      <ListItemText primary={npc.name} secondary={npc.description} />
+                      <ListItemText primary={npc.name} />
                     </ListItem>
                   ))}
                 </List>
-                
-                {renderSublocationsNpcs(sublocation.id)}
               </Collapse>
-            </React.Fragment>
+              
+              {renderSublocationsNpcs(sublocation.id)}
+            </Box>
           );
         })}
       </>
+    );
+  };
+
+  // Create a function to render the NPC details panel
+  const renderNpcDetailsPanel = () => {
+    if (!selectedNpc) return null;
+    
+    const locationName = locations.find(loc => loc.id === selectedNpc.locationId)?.name || 'Unknown';
+    const updateCharacter = useStore.getState().updateCharacter;
+    
+    // Function to add new item in edit mode
+    const handleAddItem = () => {
+      if (!selectedNpc || !editMode) return;
+      
+      const newItem: Item = {
+        id: crypto.randomUUID(),
+        name: 'New Item',
+        description: 'Item description',
+        quantity: 1
+      };
+      
+      const updatedInventory = [...(selectedNpc.inventory || []), newItem];
+      updateCharacter(selectedNpc.id, { inventory: updatedInventory });
+      setSelectedNpc({...selectedNpc, inventory: updatedInventory});
+    };
+    
+    // Function to update item in edit mode
+    const handleUpdateItem = (itemId: string, itemData: Partial<Item>) => {
+      if (!selectedNpc || !editMode) return;
+      
+      const updatedInventory = (selectedNpc.inventory || []).map(item => 
+        item.id === itemId ? {...item, ...itemData} : item
+      );
+      
+      updateCharacter(selectedNpc.id, { inventory: updatedInventory });
+      setSelectedNpc({...selectedNpc, inventory: updatedInventory});
+    };
+    
+    // Function to delete item in edit mode
+    const handleDeleteItem = (itemId: string) => {
+      if (!selectedNpc || !editMode) return;
+      
+      const updatedInventory = (selectedNpc.inventory || []).filter(item => item.id !== itemId);
+      updateCharacter(selectedNpc.id, { inventory: updatedInventory });
+      setSelectedNpc({...selectedNpc, inventory: updatedInventory});
+    };
+    
+    return (
+      <Box sx={{ p: 2, minWidth: 300, maxWidth: 400 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Typography variant="h6">{selectedNpc.name}</Typography>
+          <IconButton onClick={() => setShowNpcDetails(false)} size="small">
+            <CloseIcon />
+          </IconButton>
+        </Box>
+        
+        <Typography variant="subtitle1" color="text.secondary">{selectedNpc.type === 'npc' ? 'NPC' : 
+         selectedNpc.type === 'merchant' ? 'Merchant' : 'Enemy'}</Typography>
+        <Typography variant="body2" paragraph>{selectedNpc.description}</Typography>
+        
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="subtitle2">Location:</Typography>
+          <Typography variant="body2">{locationName}</Typography>
+        </Box>
+        
+        <Divider sx={{ my: 2 }} />
+        
+        <Box sx={{ mb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="h6">Inventory</Typography>
+          {editMode && (
+            <IconButton size="small" onClick={handleAddItem} color="primary">
+              <AddIcon />
+            </IconButton>
+          )}
+        </Box>
+        
+        {(!selectedNpc.inventory || selectedNpc.inventory.length === 0) ? (
+          <Typography variant="body2" color="text.secondary">No items in inventory</Typography>
+        ) : (
+          <List dense>
+            {selectedNpc.inventory.map((item: Item) => (
+              <ListItem 
+                key={item.id}
+                secondaryAction={editMode ? (
+                  <IconButton edge="end" size="small" onClick={() => handleDeleteItem(item.id)}>
+                    <DeleteIcon fontSize="small" />
+                  </IconButton>
+                ) : null}
+              >
+                <ListItemText 
+                  primary={
+                    editMode ? (
+                      <TextField
+                        size="small"
+                        value={item.name}
+                        onChange={(e) => handleUpdateItem(item.id, { name: e.target.value })}
+                        fullWidth
+                        variant="standard"
+                        margin="dense"
+                      />
+                    ) : item.name
+                  }
+                  secondary={
+                    <>
+                      {editMode ? (
+                        <TextField
+                          size="small"
+                          value={item.description}
+                          onChange={(e) => handleUpdateItem(item.id, { description: e.target.value })}
+                          fullWidth
+                          variant="standard"
+                          margin="dense"
+                          multiline
+                        />
+                      ) : item.description}
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
+                        <Box>
+                          Qty: {editMode ? (
+                            <TextField
+                              size="small"
+                              type="number"
+                              value={item.quantity}
+                              onChange={(e) => handleUpdateItem(item.id, { quantity: parseInt(e.target.value) || 0 })}
+                              variant="standard"
+                              sx={{ width: 50 }}
+                            />
+                          ) : item.quantity}
+                        </Box>
+                        {item.price !== undefined && (
+                          <Box>
+                            Price: {editMode ? (
+                              <TextField
+                                size="small"
+                                type="number"
+                                value={item.price}
+                                onChange={(e) => handleUpdateItem(item.id, { price: parseInt(e.target.value) || 0 })}
+                                variant="standard"
+                                sx={{ width: 60 }}
+                              />
+                            ) : item.price}
+                          </Box>
+                        )}
+                        {editMode && item.price === undefined && (
+                          <Button 
+                            size="small" 
+                            onClick={() => handleUpdateItem(item.id, { price: 0 })}
+                          >
+                            Add Price
+                          </Button>
+                        )}
+                      </Box>
+                    </>
+                  }
+                />
+              </ListItem>
+            ))}
+          </List>
+        )}
+      </Box>
+    );
+  };
+  
+  // Get combats for a specific location and its sublocations
+  const getCombatsByLocationHierarchy = (locationId: string) => {
+    const directCombats = combats.filter(combat => combat.locationId === locationId);
+    const sublocations = getSublocationsByParentId(locationId);
+    
+    let allCombats = [...directCombats];
+    
+    // Recursively get combats from sublocations
+    sublocations.forEach(sublocation => {
+      const sublocationCombats = getCombatsByLocationHierarchy(sublocation.id);
+      allCombats = [...allCombats, ...sublocationCombats];
+    });
+    
+    return allCombats;
+  };
+  
+  // Handle clicking on a combat to show its details
+  const handleCombatClick = (combat: Combat, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedCombat(combat);
+    setShowCombatDetails(true);
+  };
+  
+  // Handle starting a combat session
+  const handleStartCombat = (combat: Combat) => {
+    setActiveCombat(combat);
+    setShowCombatSession(true);
+    setShowCombatDetails(false); // Close the details panel
+  };
+  
+  // Handle ending a combat session
+  const handleEndCombatSession = () => {
+    setShowCombatSession(false);
+    setActiveCombat(null);
+  };
+  
+  // Render the combats panel showing combats in the current location
+  const renderCombatsPanel = () => {
+    if (!selectedLocation) return null;
+    
+    const directCombats = combats.filter(combat => combat.locationId === selectedLocation.id);
+    const allCombats = getCombatsByLocationHierarchy(selectedLocation.id);
+    const hasSublocationsWithCombats = allCombats.length > directCombats.length;
+    
+    if (allCombats.length === 0) {
+      return (
+        <Box sx={{ p: 2 }}>
+          <Typography variant="body2" color="text.secondary">
+            No combats in this location
+          </Typography>
+        </Box>
+      );
+    }
+    
+    return (
+      <Box>
+        <List dense>
+          {directCombats.length > 0 && (
+            <>
+              <ListItem>
+                <ListItemText 
+                  primary={`Combats in ${selectedLocation.name}`} 
+                  primaryTypographyProps={{ variant: 'subtitle1', fontWeight: 'bold' }}
+                />
+              </ListItem>
+              {directCombats.map(combat => (
+                <ListItem 
+                  key={combat.id} 
+                  button 
+                  onClick={(e) => handleCombatClick(combat, e)}
+                  sx={{ cursor: 'pointer' }}
+                >
+                  <ListItemIcon>
+                    <SportsKabaddiIcon color="primary" fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText 
+                    primary={combat.name} 
+                    secondary={`Difficulty: ${combat.difficulty || 'Medium'}`} 
+                  />
+                </ListItem>
+              ))}
+              {hasSublocationsWithCombats && <Divider sx={{ my: 1 }} />}
+            </>
+          )}
+          
+          {hasSublocationsWithCombats && renderSubLocationsCombats(selectedLocation.id)}
+        </List>
+      </Box>
+    );
+  };
+  
+  // Render combats in sublocations
+  const renderSubLocationsCombats = (locationId: string) => {
+    const sublocations = getSublocationsByParentId(locationId);
+    
+    return (
+      <>
+        {sublocations.map(sublocation => {
+          const locationCombats = combats.filter(combat => combat.locationId === sublocation.id);
+          
+          if (locationCombats.length === 0) {
+            return null;
+          }
+          
+          const sectionId = `combat-section-${sublocation.id}`;
+          const isExpanded = expandedNpcSections[sectionId] || false;
+          
+          return (
+            <Box key={sublocation.id}>
+              <ListItem 
+                button 
+                onClick={() => toggleNpcSection(sectionId)}
+                sx={{ pl: 2 }}
+              >
+                <ListItemText 
+                  primary={sublocation.name} 
+                  primaryTypographyProps={{ variant: 'subtitle2' }}
+                />
+                {isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+              </ListItem>
+              
+              <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+                <List component="div" disablePadding>
+                  {locationCombats.map(combat => (
+                    <ListItem 
+                      key={combat.id}
+                      button
+                      onClick={(e) => handleCombatClick(combat, e)}
+                      sx={{ pl: 4, cursor: 'pointer' }}
+                    >
+                      <ListItemIcon>
+                        <SportsKabaddiIcon color="primary" fontSize="small" />
+                      </ListItemIcon>
+                      <ListItemText 
+                        primary={combat.name}
+                        secondary={`Difficulty: ${combat.difficulty || 'Medium'}`} 
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+              </Collapse>
+              
+              {renderSubLocationsCombats(sublocation.id)}
+            </Box>
+          );
+        })}
+      </>
+    );
+  };
+
+  // Render the combat details panel
+  const renderCombatDetailsPanel = () => {
+    if (!selectedCombat) return null;
+    
+    const locationName = locations.find(loc => loc.id === selectedCombat.locationId)?.name || 'Unknown';
+    
+    return (
+      <Box sx={{ p: 2, minWidth: 300, maxWidth: 400 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Typography variant="h6">{selectedCombat.name}</Typography>
+          <IconButton onClick={() => setShowCombatDetails(false)} size="small">
+            <CloseIcon />
+          </IconButton>
+        </Box>
+        
+        <Typography variant="subtitle1" color="text.secondary">
+          Difficulty: {selectedCombat.difficulty || 'Medium'}
+        </Typography>
+        <Typography variant="body2" paragraph>{selectedCombat.description}</Typography>
+        
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="subtitle2">Location:</Typography>
+          <Typography variant="body2">{locationName}</Typography>
+        </Box>
+        
+        <Button
+          variant="contained"
+          color="primary"
+          fullWidth
+          startIcon={<PlayArrowIcon />}
+          onClick={() => handleStartCombat(selectedCombat)}
+          sx={{ mb: 2 }}
+        >
+          Start Combat
+        </Button>
+        
+        <Divider sx={{ my: 2 }} />
+        
+        <Typography variant="subtitle2">Player Characters:</Typography>
+        {selectedCombat.playerCharacters.length === 0 ? (
+          <Typography variant="body2" color="text.secondary">No player characters assigned</Typography>
+        ) : (
+          <List dense>
+            {selectedCombat.playerCharacters.map(character => (
+              <ListItem key={character.id}>
+                <ListItemIcon>
+                  <PersonIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText primary={character.name} />
+              </ListItem>
+            ))}
+          </List>
+        )}
+        
+        <Divider sx={{ my: 2 }} />
+        
+        <Typography variant="subtitle2">Enemies:</Typography>
+        {selectedCombat.enemies.length === 0 ? (
+          <Typography variant="body2" color="text.secondary">No enemies assigned</Typography>
+        ) : (
+          <List dense>
+            {/* Group enemies by name and count them */}
+            {Object.entries(
+              selectedCombat.enemies.reduce((acc, enemy) => {
+                acc[enemy.id] = acc[enemy.id] || { enemy, count: 0 };
+                acc[enemy.id].count++;
+                return acc;
+              }, {} as Record<string, { enemy: Character, count: number }>)
+            ).map(([id, { enemy, count }]) => (
+              <ListItem key={id}>
+                <ListItemIcon>
+                  <SportsKabaddiIcon color="error" fontSize="small" />
+                </ListItemIcon>
+                <ListItemText 
+                  primary={`${enemy.name} ${count > 1 ? `(x${count})` : ''}`} 
+                  secondary={`HP: ${enemy.hp}`}
+                />
+              </ListItem>
+            ))}
+          </List>
+        )}
+        
+        {selectedCombat.rewards && selectedCombat.rewards.length > 0 && (
+          <>
+            <Divider sx={{ my: 2 }} />
+            <Typography variant="subtitle2">Rewards:</Typography>
+            <List dense>
+              {selectedCombat.rewards.map(item => (
+                <ListItem key={item.id}>
+                  <ListItemText 
+                    primary={item.name} 
+                    secondary={`Quantity: ${item.quantity}`}
+                  />
+                </ListItem>
+              ))}
+            </List>
+          </>
+        )}
+      </Box>
     );
   };
   
@@ -806,548 +1258,593 @@ export const MapView: React.FC = () => {
   // Render the main map view
   return (
     <Box sx={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
-      {/* Sidebar */}
-      <Paper 
-        elevation={3} 
-        sx={{ 
-          width: 280, 
-          height: '100%', 
-          display: 'flex', 
-          flexDirection: 'column',
-          overflow: 'hidden',
-        }}
-      >
-        <Tabs 
-          value={showDetails ? 1 : 0} 
-          onChange={(_, value) => setShowDetails(value === 1)}
-          variant="fullWidth"
-        >
-          <Tab label="Locations" />
-          <Tab label="Details" disabled={!selectedLocation} />
-        </Tabs>
-        
-        {!showDetails ? (
-          <List 
+      {/* Show the combat session view when active */}
+      {showCombatSession && activeCombat ? (
+        <Box sx={{ 
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 1200, // High z-index to overlay everything except the audio panel
+          bgcolor: 'background.default'
+        }}>
+          <CombatSessionView 
+            combat={activeCombat} 
+            onClose={handleEndCombatSession} 
+          />
+        </Box>
+      ) : (
+        <>
+          {/* Sidebar */}
+          <Paper 
+            elevation={3} 
             sx={{ 
-              overflowY: 'auto', 
-              flexGrow: 1,
-              '& .MuiListItemButton-root.Mui-selected': {
-                bgcolor: 'primary.light',
-                '&:hover': {
-                  bgcolor: 'primary.light',
-                }
-              }
+              width: 280, 
+              height: '100%', 
+              display: 'flex', 
+              flexDirection: 'column',
+              overflow: 'hidden',
             }}
           >
-            {getAllTopLevelLocations().map((location) => renderLocationItem(location))}
-          </List>
-        ) : (
-          <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            <Box sx={{ p: 2, borderBottom: '1px solid rgba(0, 0, 0, 0.12)' }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                <IconButton 
-                  size="small"
-                  onClick={() => setShowDetails(false)}
-                  sx={{ mr: 1 }}
-                >
-                  <ArrowBackIcon fontSize="small" />
-                </IconButton>
-                <Typography variant="h6" noWrap>{selectedLocation?.name}</Typography>
-                
-                {editMode && (
-                  <IconButton 
-                    size="small" 
-                    color="primary"
-                    onClick={() => {
-                      if (selectedLocation) {
-                        setEditingLocation(selectedLocation);
-                        setShowEditDialog(true);
-                      }
-                    }}
-                    sx={{ ml: 'auto' }}
-                  >
-                    <EditIcon fontSize="small" />
-                  </IconButton>
-                )}
-              </Box>
-              
-              {selectedLocation?.description && (
-                <Typography variant="body2" color="text.secondary">
-                  {selectedLocation.description}
-                </Typography>
-              )}
-            </Box>
+            <Tabs 
+              value={showDetails ? 1 : 0} 
+              onChange={(_, value) => setShowDetails(value === 1)}
+              variant="fullWidth"
+            >
+              <Tab label="Locations" />
+              <Tab label="Details" disabled={!selectedLocation} />
+            </Tabs>
             
-            <Box sx={{ overflow: 'auto', flexGrow: 1 }}>
-              {/* Location details tabs */}
-              <Tabs 
-                value={detailsTab} 
-                onChange={(_, value) => setDetailsTab(value)}
-                variant="fullWidth" 
-                sx={{ borderBottom: 1, borderColor: 'divider' }}
+            {!showDetails ? (
+              <List 
+                sx={{ 
+                  overflowY: 'auto', 
+                  flexGrow: 1,
+                  '& .MuiListItemButton-root.Mui-selected': {
+                    bgcolor: 'primary.light',
+                    '&:hover': {
+                      bgcolor: 'primary.light',
+                    }
+                  }
+                }}
               >
-                <Tab label="Info" />
-                <Tab label="NPCs" />
-              </Tabs>
-              
-              {/* Info Panel */}
-              {detailsTab === 0 && (
-                <Box sx={{ p: 2 }}>
-                  {selectedLocation?.backgroundMusic && (
-                    <Box sx={{ mb: 2 }}>
-                      <Typography variant="subtitle2">Background Music:</Typography>
-                      <Chip 
-                        icon={<MusicNoteIcon />} 
-                        label={selectedLocation.backgroundMusic}
-                        size="small"
+                {getAllTopLevelLocations().map((location) => renderLocationItem(location))}
+              </List>
+            ) : (
+              <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                <Box sx={{ p: 2, borderBottom: '1px solid rgba(0, 0, 0, 0.12)' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                    <IconButton 
+                      size="small"
+                      onClick={() => setShowDetails(false)}
+                      sx={{ mr: 1 }}
+                    >
+                      <ArrowBackIcon fontSize="small" />
+                    </IconButton>
+                    <Typography variant="h6" noWrap>{selectedLocation?.name}</Typography>
+                    
+                    {editMode && (
+                      <IconButton 
+                        size="small" 
                         color="primary"
-                        variant="outlined"
                         onClick={() => {
-                          if (selectedLocation?.backgroundMusic) {
-                            playTrack(selectedLocation.backgroundMusic, { 
-                              replace: true,
-                              locationId: selectedLocation.id,
-                              loop: true
-                            });
+                          if (selectedLocation) {
+                            setEditingLocation(selectedLocation);
+                            setShowEditDialog(true);
                           }
                         }}
-                      />
-                    </Box>
-                  )}
+                        sx={{ ml: 'auto' }}
+                      >
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                    )}
+                  </Box>
                   
-                  {selectedLocation?.entrySound && (
-                    <Box sx={{ mb: 2 }}>
-                      <Typography variant="subtitle2">Entry Sound:</Typography>
-                      <Chip 
-                        icon={<MusicNoteIcon />} 
-                        label={selectedLocation.entrySound}
-                        size="small"
-                        color="secondary"
-                        variant="outlined"
-                        onClick={() => {
-                          if (selectedLocation?.entrySound) {
-                            playTrack(selectedLocation.entrySound, { 
-                              replace: false,
-                              locationId: selectedLocation.id
-                            });
-                          }
-                        }}
-                      />
-                    </Box>
-                  )}
-                  
-                  {selectedLocation?.connectedLocations && selectedLocation.connectedLocations.length > 0 && (
-                    <Box sx={{ mb: 2 }}>
-                      <Typography variant="subtitle2">Connected Locations:</Typography>
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
-                        {selectedLocation.connectedLocations.map(locId => {
-                          const connectedLoc = locations.find(l => l.id === locId);
-                          if (!connectedLoc) return null;
-                          
-                          return (
-                            <Chip 
-                              key={locId}
-                              icon={<PlaceIcon />}
-                              label={connectedLoc.name}
-                              size="small"
-                              color="info"
-                              variant="outlined"
-                              onClick={() => handleLocationClick(connectedLoc, {} as React.MouseEvent)}
-                            />
-                          );
-                        })}
-                      </Box>
-                    </Box>
+                  {selectedLocation?.description && (
+                    <Typography variant="body2" color="text.secondary">
+                      {selectedLocation.description}
+                    </Typography>
                   )}
                 </Box>
-              )}
-              
-              {/* NPCs Panel */}
-              {detailsTab === 1 && renderNpcsPanel()}
-            </Box>
-          </Box>
-        )}
-      </Paper>
-
-      {/* Main content area */}
-      <Box sx={{ 
-        flexGrow: 1, 
-        position: 'relative', 
-        height: '100%', 
-        overflow: 'hidden' 
-      }}>
-        {/* Edit mode toggle button */}
-        <SpeedDial
-          ariaLabel="Edit mode"
-          sx={{ position: 'absolute', bottom: 16, right: 16, zIndex: 100 }}
-          icon={editMode ? <CancelIcon /> : <EditIcon />}
-          onClick={toggleEditMode}
-        >
-          {editMode && (
-            <SpeedDialAction
-              icon={<SaveIcon />}
-              tooltipTitle="Save Changes"
-              onClick={handleSaveData}
-            />
-          )}
-        </SpeedDial>
-        
-        {/* Map container */}
-        <Box
-          ref={mapContainerRef}
-          sx={{
-            width: '100%',
-            height: '100%',
-            position: 'relative',
-            bgcolor: '#2C3333',
-            userSelect: 'none',
-            cursor: editMode ? 'crosshair' : 'default',
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            overflow: 'hidden',
-          }}
-        >
-          {isLoading ? (
-            <Box 
-              sx={{ 
-                width: '100%', 
-                height: '100%', 
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center', 
-                justifyContent: 'center',
-                backgroundColor: 'rgba(0, 0, 0, 0.2)'
-              }}
-            >
-              <CircularProgress size={60} />
-              <Typography variant="body1" sx={{ mt: 2 }}>
-                Loading map...
-              </Typography>
-            </Box>
-          ) : !imageUrl || !selectedLocation ? (
-            <Box 
-              sx={{ 
-                width: '100%', 
-                height: '100%', 
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center', 
-                justifyContent: 'center',
-                backgroundColor: 'rgba(0, 0, 0, 0.1)'
-              }}
-            >
-              <ImageNotSupportedIcon sx={{ fontSize: 60, opacity: 0.7 }} />
-              <Typography variant="body1" sx={{ mt: 2, opacity: 0.7 }}>
-                No map image available
-              </Typography>
-            </Box>
-          ) : (
-            <TransformWrapper
-              key="main-map"
-              initialScale={1}
-              initialPositionX={0}
-              initialPositionY={0}
-              minScale={0.5}
-              maxScale={5}
-              wheel={{ step: 0.1 }}
-              limitToBounds={false}
-              disablePadding={true}
-              disabled={editMode}
-            >
-              {() => (
-                <>
-                  <TransformComponent
-                    wrapperStyle={{
-                      width: '100%',
-                      height: '100%',
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      zIndex: 0,
-                    }}
-                    contentStyle={{
-                      width: '100%',
-                      height: '100%',
-                      display: 'flex',
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                    }}
+                
+                <Box sx={{ overflow: 'auto', flexGrow: 1 }}>
+                  {/* Location details tabs */}
+                  <Tabs 
+                    value={detailsTab} 
+                    onChange={(_, value) => setDetailsTab(value)}
+                    variant="fullWidth" 
+                    sx={{ borderBottom: 1, borderColor: 'divider' }}
                   >
-                    <Box 
-                      sx={{
-                        position: 'relative',
-                        display: 'flex',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        width: '100%',
-                        height: '100%',
-                      }}
-                      onClick={editMode ? handleMapClick : undefined}
-                      onDragOver={editMode ? handleDragOver : undefined}
-                      onDrop={editMode ? handleDrop : undefined}
-                    >
-                      <img
-                        ref={imageRef}
-                        src={imageUrl}
-                        alt={selectedLocation?.name || 'Map'}
-                        style={{
-                          maxWidth: '100%',
-                          maxHeight: '100%',
-                          objectFit: 'contain',
-                          position: 'relative',
-                          zIndex: 1,
-                        }}
-                        onLoad={() => setIsImageLoading(false)}
-                        onError={() => setIsImageLoading(false)}
-                      />
-                      {renderLocationMarkers()}
-                      {getDirectionalArrows()}
+                    <Tab label="Info" />
+                    <Tab label="NPCs" />
+                    <Tab label="Combats" />
+                  </Tabs>
+                  
+                  {/* Info Panel */}
+                  {detailsTab === 0 && (
+                    <Box sx={{ p: 2 }}>
+                      {selectedLocation?.backgroundMusic && (
+                        <Box sx={{ mb: 2 }}>
+                          <Typography variant="subtitle2">Background Music:</Typography>
+                          <Chip 
+                            icon={<MusicNoteIcon />} 
+                            label={selectedLocation.backgroundMusic}
+                            size="small"
+                            color="primary"
+                            variant="outlined"
+                            onClick={() => {
+                              if (selectedLocation?.backgroundMusic) {
+                                playTrack(selectedLocation.backgroundMusic, { 
+                                  replace: true,
+                                  locationId: selectedLocation.id,
+                                  loop: true
+                                });
+                              }
+                            }}
+                          />
+                        </Box>
+                      )}
+                      
+                      {selectedLocation?.entrySound && (
+                        <Box sx={{ mb: 2 }}>
+                          <Typography variant="subtitle2">Entry Sound:</Typography>
+                          <Chip 
+                            icon={<MusicNoteIcon />} 
+                            label={selectedLocation.entrySound}
+                            size="small"
+                            color="secondary"
+                            variant="outlined"
+                            onClick={() => {
+                              if (selectedLocation?.entrySound) {
+                                playTrack(selectedLocation.entrySound, { 
+                                  replace: false,
+                                  locationId: selectedLocation.id
+                                });
+                              }
+                            }}
+                          />
+                        </Box>
+                      )}
+                      
+                      {selectedLocation?.connectedLocations && selectedLocation.connectedLocations.length > 0 && (
+                        <Box sx={{ mb: 2 }}>
+                          <Typography variant="subtitle2">Connected Locations:</Typography>
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
+                            {selectedLocation.connectedLocations.map(locId => {
+                              const connectedLoc = locations.find(l => l.id === locId);
+                              if (!connectedLoc) return null;
+                              
+                              return (
+                                <Chip 
+                                  key={locId}
+                                  icon={<PlaceIcon />}
+                                  label={connectedLoc.name}
+                                  size="small"
+                                  color="info"
+                                  variant="outlined"
+                                  onClick={() => handleLocationClick(connectedLoc, {} as React.MouseEvent)}
+                                />
+                              );
+                            })}
+                          </Box>
+                        </Box>
+                      )}
                     </Box>
-                  </TransformComponent>
-                </>
+                  )}
+                  
+                  {/* NPCs Panel */}
+                  {detailsTab === 1 && renderNpcsPanel()}
+                  
+                  {/* Combats Panel */}
+                  {detailsTab === 2 && renderCombatsPanel()}
+                </Box>
+              </Box>
+            )}
+          </Paper>
+
+          {/* Main content area */}
+          <Box sx={{ 
+            flexGrow: 1, 
+            position: 'relative', 
+            height: '100%', 
+            overflow: 'hidden' 
+          }}>
+            {/* Edit mode toggle button */}
+            <SpeedDial
+              ariaLabel="Edit mode"
+              sx={{ position: 'absolute', bottom: 16, right: 16, zIndex: 100 }}
+              icon={editMode ? <CancelIcon /> : <EditIcon />}
+              onClick={toggleEditMode}
+            >
+              {editMode && (
+                <SpeedDialAction
+                  icon={<SaveIcon />}
+                  tooltipTitle="Save Changes"
+                  onClick={handleSaveData}
+                />
               )}
-            </TransformWrapper>
-          )}
-          
-          {/* Empty state */}
-          {!hasLocations && !isLoading && (
+            </SpeedDial>
+            
+            {/* Map container */}
             <Box
+              ref={mapContainerRef}
               sx={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
                 width: '100%',
                 height: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 10,
+                position: 'relative',
+                bgcolor: '#2C3333',
+                userSelect: 'none',
+                cursor: editMode ? 'crosshair' : 'default',
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                overflow: 'hidden',
               }}
             >
-              <Box sx={{ textAlign: 'center', maxWidth: 400, p: 3, bgcolor: 'rgba(0,0,0,0.8)', color: 'white', borderRadius: 2 }}>
-                <Typography variant="h5" gutterBottom>
-                  No locations found
-                </Typography>
-                <Typography variant="body1" paragraph>
-                  Your campaign doesn't have any locations yet. Import data or create locations in edit mode.
-                </Typography>
-                <Button 
-                  variant="contained" 
-                  color="primary" 
-                  sx={{ mr: 1 }}
-                  onClick={() => setShowAssetManager(true)}
+              {isLoading ? (
+                <Box 
+                  sx={{ 
+                    width: '100%', 
+                    height: '100%', 
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    backgroundColor: 'rgba(0, 0, 0, 0.2)'
+                  }}
                 >
-                  Import Assets
-                </Button>
-                <Button 
-                  variant="outlined" 
-                  color="secondary"
-                  onClick={toggleEditMode}
+                  <CircularProgress size={60} />
+                  <Typography variant="body1" sx={{ mt: 2 }}>
+                    Loading map...
+                  </Typography>
+                </Box>
+              ) : !imageUrl || !selectedLocation ? (
+                <Box 
+                  sx={{ 
+                    width: '100%', 
+                    height: '100%', 
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    backgroundColor: 'rgba(0, 0, 0, 0.1)'
+                  }}
                 >
-                  {editMode ? 'Exit Edit Mode' : 'Enter Edit Mode'}
-                </Button>
-              </Box>
-            </Box>
-          )}
-        </Box>
-      </Box>
-
-      {/* Edit Location Dialog */}
-      <Dialog open={showEditDialog} onClose={() => setShowEditDialog(false)} maxWidth="md" fullWidth>
-        <DialogTitle>
-          Edit Location
-          <IconButton
-            aria-label="close"
-            onClick={() => setShowEditDialog(false)}
-            sx={{ position: 'absolute', right: 8, top: 8 }}
-          >
-            <CancelIcon />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent dividers>
-          {editingLocation && (
-            <Stack spacing={2}>
-              <TextField
-                label="Name"
-                fullWidth
-                value={editingLocation.name}
-                onChange={(e) => setEditingLocation({
-                  ...editingLocation,
-                  name: e.target.value
-                })}
-              />
-              <TextField
-                label="Description"
-                fullWidth
-                multiline
-                rows={4}
-                value={editingLocation.description}
-                onChange={(e) => setEditingLocation({
-                  ...editingLocation,
-                  description: e.target.value
-                })}
-              />
-              {editingLocation && editingLocation.coordinates && (
-                <Box sx={{ display: 'flex', gap: 2 }}>
-                  <TextField
-                    label="X Coordinate"
-                    type="number"
-                    InputProps={{ inputProps: { min: 0, max: 1, step: 0.01 } }}
-                    value={editingLocation.coordinates[0]}
-                    onChange={(e) => {
-                      if (editingLocation.coordinates) {
-                        const x = parseFloat(e.target.value);
-                        const y = editingLocation.coordinates[1];
-                        setEditingLocation({
-                          ...editingLocation,
-                          coordinates: [x, y]
-                        });
-                      }
-                    }}
-                  />
-                  <TextField
-                    label="Y Coordinate"
-                    type="number"
-                    InputProps={{ inputProps: { min: 0, max: 1, step: 0.01 } }}
-                    value={editingLocation.coordinates[1]}
-                    onChange={(e) => {
-                      if (editingLocation.coordinates) {
-                        const x = editingLocation.coordinates[0];
-                        const y = parseFloat(e.target.value);
-                        setEditingLocation({
-                          ...editingLocation,
-                          coordinates: [x, y]
-                        });
-                      }
-                    }}
-                  />
+                  <ImageNotSupportedIcon sx={{ fontSize: 60, opacity: 0.7 }} />
+                  <Typography variant="body1" sx={{ mt: 2, opacity: 0.7 }}>
+                    No map image available
+                  </Typography>
+                </Box>
+              ) : (
+                <TransformWrapper
+                  key="main-map"
+                  initialScale={1}
+                  initialPositionX={0}
+                  initialPositionY={0}
+                  minScale={0.5}
+                  maxScale={5}
+                  wheel={{ step: 0.1 }}
+                  limitToBounds={false}
+                  disablePadding={true}
+                  disabled={editMode}
+                >
+                  {() => (
+                    <>
+                      <TransformComponent
+                        wrapperStyle={{
+                          width: '100%',
+                          height: '100%',
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          zIndex: 0,
+                        }}
+                        contentStyle={{
+                          width: '100%',
+                          height: '100%',
+                          display: 'flex',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <Box 
+                          sx={{
+                            position: 'relative',
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            width: '100%',
+                            height: '100%',
+                          }}
+                          onClick={editMode ? handleMapClick : undefined}
+                          onDragOver={editMode ? handleDragOver : undefined}
+                          onDrop={editMode ? handleDrop : undefined}
+                        >
+                          <img
+                            ref={imageRef}
+                            src={imageUrl}
+                            alt={selectedLocation?.name || 'Map'}
+                            style={{
+                              maxWidth: '100%',
+                              maxHeight: '100%',
+                              objectFit: 'contain',
+                              position: 'relative',
+                              zIndex: 1,
+                            }}
+                            onLoad={() => setIsImageLoading(false)}
+                            onError={() => setIsImageLoading(false)}
+                          />
+                          {renderLocationMarkers()}
+                          {getDirectionalArrows()}
+                        </Box>
+                      </TransformComponent>
+                    </>
+                  )}
+                </TransformWrapper>
+              )}
+              
+              {/* Empty state */}
+              {!hasLocations && !isLoading && (
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 10,
+                  }}
+                >
+                  <Box sx={{ textAlign: 'center', maxWidth: 400, p: 3, bgcolor: 'rgba(0,0,0,0.8)', color: 'white', borderRadius: 2 }}>
+                    <Typography variant="h5" gutterBottom>
+                      No locations found
+                    </Typography>
+                    <Typography variant="body1" paragraph>
+                      Your campaign doesn't have any locations yet. Import data or create locations in edit mode.
+                    </Typography>
+                    <Button 
+                      variant="contained" 
+                      color="primary" 
+                      sx={{ mr: 1 }}
+                      onClick={() => setShowAssetManager(true)}
+                    >
+                      Import Assets
+                    </Button>
+                    <Button 
+                      variant="outlined" 
+                      color="secondary"
+                      onClick={toggleEditMode}
+                    >
+                      {editMode ? 'Exit Edit Mode' : 'Enter Edit Mode'}
+                    </Button>
+                  </Box>
                 </Box>
               )}
-              <FormControl fullWidth>
-                <InputLabel>Background Map Image</InputLabel>
-                <Select
-                  value={editingLocation.imageUrl || ''}
-                  label="Background Map Image"
-                  onChange={(e) => setEditingLocation({
-                    ...editingLocation,
-                    imageUrl: e.target.value || undefined
-                  })}
-                >
-                  <MenuItem value="">None</MenuItem>
-                  {imageAssets.map(asset => (
-                    <MenuItem key={asset} value={asset}>
-                      {asset}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <FormControl fullWidth>
-                <InputLabel>Background Music</InputLabel>
-                <Select
-                  value={editingLocation.backgroundMusic || ''}
-                  label="Background Music"
-                  onChange={(e) => setEditingLocation({
-                    ...editingLocation,
-                    backgroundMusic: e.target.value || undefined
-                  })}
-                >
-                  <MenuItem value="">None</MenuItem>
-                  {audioAssets.map(asset => (
-                    <MenuItem key={asset} value={asset}>
-                      {asset}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <FormControl fullWidth>
-                <InputLabel>Entry Sound</InputLabel>
-                <Select
-                  value={editingLocation.entrySound || ''}
-                  label="Entry Sound"
-                  onChange={(e) => setEditingLocation({
-                    ...editingLocation,
-                    entrySound: e.target.value || undefined
-                  })}
-                >
-                  <MenuItem value="">None</MenuItem>
-                  {audioAssets.map(asset => (
-                    <MenuItem key={asset} value={asset}>
-                      {asset}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={editingLocation.mixWithParent || false}
+            </Box>
+          </Box>
+
+          {/* Edit Location Dialog */}
+          <Dialog open={showEditDialog} onClose={() => setShowEditDialog(false)} maxWidth="md" fullWidth>
+            <DialogTitle>
+              Edit Location
+              <IconButton
+                aria-label="close"
+                onClick={() => setShowEditDialog(false)}
+                sx={{ position: 'absolute', right: 8, top: 8 }}
+              >
+                <CancelIcon />
+              </IconButton>
+            </DialogTitle>
+            <DialogContent dividers>
+              {editingLocation && (
+                <Stack spacing={2}>
+                  <TextField
+                    label="Name"
+                    fullWidth
+                    value={editingLocation.name}
                     onChange={(e) => setEditingLocation({
                       ...editingLocation,
-                      mixWithParent: e.target.checked
+                      name: e.target.value
                     })}
                   />
-                }
-                label="Mix audio with parent location"
-              />
-            </Stack>
-          )}
-        </DialogContent>
-        <DialogActions>
-          {editingLocation && (
-            <Button 
-              color="error" 
-              startIcon={<DeleteIcon />}
-              onClick={() => {
-                if (window.confirm('Are you sure you want to delete this location? This cannot be undone.')) {
-                  const deleteLocation = useStore.getState().deleteLocation;
-                  deleteLocation(editingLocation.id);
-                  useStore.getState().saveDataToIndexedDB();
-                  setShowEditDialog(false);
-                  setEditingLocation(null);
-                }
-              }}
-            >
-              Delete
-            </Button>
-          )}
-          <Button onClick={() => setShowEditDialog(false)}>
-            Cancel
-          </Button>
-          <Button 
-            onClick={() => {
-              if (editingLocation) {
-                const updateLocation = useStore.getState().updateLocation;
-                updateLocation(editingLocation.id, editingLocation);
-                useStore.getState().saveDataToIndexedDB();
-                setShowEditDialog(false);
-                setEditingLocation(null);
-              }
-            }} 
-            variant="contained"
+                  <TextField
+                    label="Description"
+                    fullWidth
+                    multiline
+                    rows={4}
+                    value={editingLocation.description}
+                    onChange={(e) => setEditingLocation({
+                      ...editingLocation,
+                      description: e.target.value
+                    })}
+                  />
+                  {editingLocation && editingLocation.coordinates && (
+                    <Box sx={{ display: 'flex', gap: 2 }}>
+                      <TextField
+                        label="X Coordinate"
+                        type="number"
+                        InputProps={{ inputProps: { min: 0, max: 1, step: 0.01 } }}
+                        value={editingLocation.coordinates[0]}
+                        onChange={(e) => {
+                          if (editingLocation.coordinates) {
+                            const x = parseFloat(e.target.value);
+                            const y = editingLocation.coordinates[1];
+                            setEditingLocation({
+                              ...editingLocation,
+                              coordinates: [x, y]
+                            });
+                          }
+                        }}
+                      />
+                      <TextField
+                        label="Y Coordinate"
+                        type="number"
+                        InputProps={{ inputProps: { min: 0, max: 1, step: 0.01 } }}
+                        value={editingLocation.coordinates[1]}
+                        onChange={(e) => {
+                          if (editingLocation.coordinates) {
+                            const x = editingLocation.coordinates[0];
+                            const y = parseFloat(e.target.value);
+                            setEditingLocation({
+                              ...editingLocation,
+                              coordinates: [x, y]
+                            });
+                          }
+                        }}
+                      />
+                    </Box>
+                  )}
+                  <FormControl fullWidth>
+                    <InputLabel>Background Map Image</InputLabel>
+                    <Select
+                      value={editingLocation.imageUrl || ''}
+                      label="Background Map Image"
+                      onChange={(e) => setEditingLocation({
+                        ...editingLocation,
+                        imageUrl: e.target.value || undefined
+                      })}
+                    >
+                      <MenuItem value="">None</MenuItem>
+                      {imageAssets.map(asset => (
+                        <MenuItem key={asset} value={asset}>
+                          {asset}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  <FormControl fullWidth>
+                    <InputLabel>Background Music</InputLabel>
+                    <Select
+                      value={editingLocation.backgroundMusic || ''}
+                      label="Background Music"
+                      onChange={(e) => setEditingLocation({
+                        ...editingLocation,
+                        backgroundMusic: e.target.value || undefined
+                      })}
+                    >
+                      <MenuItem value="">None</MenuItem>
+                      {audioAssets.map(asset => (
+                        <MenuItem key={asset} value={asset}>
+                          {asset}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  <FormControl fullWidth>
+                    <InputLabel>Entry Sound</InputLabel>
+                    <Select
+                      value={editingLocation.entrySound || ''}
+                      label="Entry Sound"
+                      onChange={(e) => setEditingLocation({
+                        ...editingLocation,
+                        entrySound: e.target.value || undefined
+                      })}
+                    >
+                      <MenuItem value="">None</MenuItem>
+                      {audioAssets.map(asset => (
+                        <MenuItem key={asset} value={asset}>
+                          {asset}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={editingLocation.mixWithParent || false}
+                        onChange={(e) => setEditingLocation({
+                          ...editingLocation,
+                          mixWithParent: e.target.checked
+                        })}
+                      />
+                    }
+                    label="Mix audio with parent location"
+                  />
+                </Stack>
+              )}
+            </DialogContent>
+            <DialogActions>
+              {editingLocation && (
+                <Button 
+                  color="error" 
+                  startIcon={<DeleteIcon />}
+                  onClick={() => {
+                    if (window.confirm('Are you sure you want to delete this location? This cannot be undone.')) {
+                      const deleteLocation = useStore.getState().deleteLocation;
+                      deleteLocation(editingLocation.id);
+                      useStore.getState().saveDataToIndexedDB();
+                      setShowEditDialog(false);
+                      setEditingLocation(null);
+                    }
+                  }}
+                >
+                  Delete
+                </Button>
+              )}
+              <Button onClick={() => setShowEditDialog(false)}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={() => {
+                  if (editingLocation) {
+                    const updateLocation = useStore.getState().updateLocation;
+                    updateLocation(editingLocation.id, editingLocation);
+                    useStore.getState().saveDataToIndexedDB();
+                    setShowEditDialog(false);
+                    setEditingLocation(null);
+                  }
+                }} 
+                variant="contained"
+              >
+                Save
+              </Button>
+            </DialogActions>
+          </Dialog>
+
+          {/* Asset Manager Dialog */}
+          <Dialog open={showAssetManager} onClose={() => setShowAssetManager(false)} maxWidth="md" fullWidth>
+            <DialogTitle>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                Asset Manager
+                <IconButton 
+                  edge="end" 
+                  onClick={() => setShowAssetManager(false)}
+                >
+                  <CloseIcon />
+                </IconButton>
+              </Box>
+            </DialogTitle>
+            <DialogContent dividers>
+              <AssetDropZone onAssetImport={handleAssetImport} />
+            </DialogContent>
+          </Dialog>
+
+          {/* NPC Details Dialog */}
+          <Dialog
+            open={showNpcDetails}
+            onClose={() => setShowNpcDetails(false)}
+            maxWidth="sm"
+            fullWidth
           >
-            Save
-          </Button>
-        </DialogActions>
-      </Dialog>
+            {renderNpcDetailsPanel()}
+          </Dialog>
 
-      {/* Asset Manager Dialog */}
-      <Dialog open={showAssetManager} onClose={() => setShowAssetManager(false)} maxWidth="md" fullWidth>
-        <DialogTitle>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            Asset Manager
-            <IconButton 
-              edge="end" 
-              onClick={() => setShowAssetManager(false)}
-            >
-              <CloseIcon />
-            </IconButton>
-          </Box>
-        </DialogTitle>
-        <DialogContent dividers>
-          <AssetDropZone onAssetImport={handleAssetImport} />
-        </DialogContent>
-      </Dialog>
+          {/* Combat Details Dialog */}
+          <Dialog
+            open={showCombatDetails}
+            onClose={() => setShowCombatDetails(false)}
+            maxWidth="sm"
+            fullWidth
+          >
+            {renderCombatDetailsPanel()}
+          </Dialog>
+        </>
+      )}
 
+      {/* Audio Track Panel - keep outside conditional rendering so it's always visible */}
       <AudioTrackPanel />
     </Box>
   );

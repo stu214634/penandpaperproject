@@ -11,6 +11,7 @@ import { Dashboard } from './pages/Dashboard';
 const MapViewLazy = lazy(() => import('./pages/MapView').then(module => ({ default: module.MapView })));
 const LocationsViewLazy = lazy(() => import('./pages/LocationsView').then(module => ({ default: module.LocationsView })));
 const CharactersViewLazy = lazy(() => import('./pages/CharactersView').then(module => ({ default: module.CharactersView })));
+const CombatsViewLazy = lazy(() => import('./components/CombatsView').then(module => ({ default: module.CombatsView })));
 
 // Loading component for Suspense fallback
 const LoadingComponent = () => (
@@ -23,7 +24,7 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <BrowserRouter>
+      <BrowserRouter basename="/penandpaperproject">
         <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
           <Navigation />
           <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
@@ -33,7 +34,7 @@ function App() {
                 <Route path="/map" element={<MapViewLazy />} />
                 <Route path="/locations" element={<LocationsViewLazy />} />
                 <Route path="/characters" element={<CharactersViewLazy />} />
-                {/* Temporarily comment out until available */}
+                <Route path="/combats" element={<CombatsViewLazy />} />
               </Routes>
             </Suspense>
           </Box>

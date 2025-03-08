@@ -98,9 +98,10 @@ export const AssetDropZone: React.FC<AssetDropZoneProps> = ({
       setAudioAssets(audioAssets.map(asset => asset.name));
       setImageAssets(imageAssets.map(asset => asset.name));
       setDataAssets(dataAssets.map(asset => asset.name));
+      
+      setIsLoadingAssets(false);
     } catch (error) {
-      console.error('Error loading asset lists:', error);
-    } finally {
+      console.error('Error loading assets:', error);
       setIsLoadingAssets(false);
     }
   };

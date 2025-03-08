@@ -86,6 +86,7 @@ export class AssetManager {
             const fileData = await folder.files[path].async('base64');
             const mimeType = this.getMimeType(fileName);
             
+            // Add to the appropriate collection
             collection.push({
               name: fileName,
               data: fileData,
@@ -342,6 +343,7 @@ export class AssetManager {
   // Export all assets to a zip file
   static async exportToZip(): Promise<{ success: boolean; message: string; zipBlob?: Blob }> {
     try {
+      // Create a new JSZip instance
       const zip = new JSZip();
       
       // Create folders for each asset type

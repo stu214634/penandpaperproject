@@ -25,7 +25,7 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import SaveIcon from '@mui/icons-material/Save';
 import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
 import { useStore } from '../store';
-
+import SportsKabaddiIcon from '@mui/icons-material/SportsKabaddi';
 export const Navigation: React.FC = () => {
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const location = useLocation();
@@ -74,7 +74,7 @@ export const Navigation: React.FC = () => {
     { path: '/map', label: 'Map View', icon: <MapIcon /> },
     { path: '/locations', label: 'Locations Editor', icon: <PlaceIcon /> },
     { path: '/characters', label: 'Characters Editor', icon: <PersonIcon /> },
-    { path: '/settings', label: 'Settings', icon: <SettingsIcon /> },
+    { path: '/combats', label: 'Combats Editor', icon: <SportsKabaddiIcon /> }
   ];
 
   return (

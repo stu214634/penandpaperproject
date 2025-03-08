@@ -13,6 +13,12 @@ const getCharactersData = async () => {
   return customCharacters || [];
 };
 
+// Add a function to get combats data
+const getCombatsData = async () => {
+  const combatsData = await AssetManager.getDataObject<Combat[]>('combats.json');
+  return combatsData || [];
+};
+
 // Initialize with empty data, will be populated after async loading
 const initialLocations: CustomLocation[] = [];
 const initialCharacters: Character[] = [];
@@ -32,21 +38,41 @@ export interface CustomLocation {
   connectedLocations?: string[];
 }
 
-interface Character {
+export interface Character {
   id: string;
   name: string;
   description: string;
-  type: 'npc' | 'merchant';
+  type: 'npc' | 'merchant' | 'enemy' | 'player';
+  descriptionType?: 'markdown' | 'image' | 'pdf';
+  descriptionAssetName?: string;  // Reference to an image/pdf in assets
+  hp: number;  // Hit Points
   inventory?: Item[];
   locationId?: string;
 }
 
-interface Item {
+export interface Item {
   id: string;
   name: string;
   description: string;
   quantity: number;
   price?: number;
+}
+
+// Interface for Combat entities
+export interface Combat {
+  id: string;
+  name: string;
+  description: string;      // Can be markdown text
+  descriptionType: 'markdown' | 'image' | 'pdf';
+  descriptionAssetName?: string;  // Reference to an image/pdf in assets
+  playerCharacters: Character[];
+  enemies: Character[];
+  entrySound?: string;      // Reference to audio asset
+  backgroundMusic?: string; // Reference to audio asset
+  backgroundImage?: string; // Reference to image asset
+  difficulty?: 'easy' | 'medium' | 'hard' | 'custom';
+  rewards?: Item[];
+  locationId?: string;      // Location where this combat takes place
 }
 
 interface AudioTrack {
@@ -74,6 +100,7 @@ interface StoreState {
   };
   selectedLocationId: string | null;
   characters: Character[];
+  combats: Combat[];
   audioTracks: AudioTrack[];
   currentLocation?: CustomLocation;
   currentHowl: Howl | null;
@@ -88,6 +115,9 @@ interface StoreState {
   addCharacter: (character: Omit<Character, 'id'>) => void;
   updateCharacter: (characterId: string, characterData: Partial<Omit<Character, 'id'>>) => void;
   deleteCharacter: (characterId: string) => void;
+  addCombat: (combat: Omit<Combat, 'id'>) => void;
+  updateCombat: (combatId: string, combatData: Partial<Omit<Combat, 'id'>>) => void;
+  deleteCombat: (combatId: string) => void;
   addAudioTrack: (track: Omit<AudioTrack, 'id'>) => void;
   setCurrentLocation: (locationId: string) => void;
   playTrack: (url: string, options?: { replace?: boolean, locationId?: string, loop?: boolean }) => void;
@@ -110,29 +140,28 @@ export const useStore = create<StoreState>((set, get) => {
     try {
       set({ isLoading: true });
       
-      // Check if any assets exist
-      const hasAudioAssets = await AssetManager.hasAssets('audio');
-      const hasImageAssets = await AssetManager.hasAssets('images');
-      const hasDataAssets = await AssetManager.hasAssets('data');
+      // Check if we have assets
+      const hasAudio = await AssetManager.hasAssets('audio');
+      const hasImages = await AssetManager.hasAssets('images');
+      const hasData = await AssetManager.hasAssets('data');
       
-      const hasAssets = hasAudioAssets || hasImageAssets || hasDataAssets;
+      const hasAssets = hasAudio || hasImages || hasData;
+      set({ hasAssets });
       
-      // If assets exist, load them
       if (hasAssets) {
+        // Load locations and characters from IndexedDB
         const locations = await getLocationsData();
         const characters = await getCharactersData();
+        const combats = await getCombatsData();
         
-        set({
-          locations,
+        set({ 
+          locations, 
           characters,
-          hasAssets,
-          isLoading: false
+          combats,
+          isLoading: false 
         });
       } else {
-        set({
-          hasAssets,
-          isLoading: false
-        });
+        set({ isLoading: false });
       }
     } catch (error) {
       console.error('Error initializing store:', error);
@@ -151,6 +180,7 @@ export const useStore = create<StoreState>((set, get) => {
     },
     selectedLocationId: null,
     characters: initialCharacters,
+    combats: [],
     audioTracks: [],
     currentLocation: undefined,
     currentHowl: null,
@@ -223,6 +253,29 @@ export const useStore = create<StoreState>((set, get) => {
     deleteCharacter: (characterId) => {
       set((state) => ({
         characters: state.characters.filter(char => char.id !== characterId)
+      }));
+    },
+
+    addCombat: (combat) => {
+      const newCombat = { ...combat, id: crypto.randomUUID() };
+      set((state) => ({
+        combats: [...state.combats, newCombat],
+      }));
+    },
+
+    updateCombat: (combatId, combatData) => {
+      set((state) => ({
+        combats: state.combats.map(combat => 
+          combat.id === combatId 
+            ? { ...combat, ...combatData } 
+            : combat
+        )
+      }));
+    },
+    
+    deleteCombat: (combatId) => {
+      set((state) => ({
+        combats: state.combats.filter(combat => combat.id !== combatId)
       }));
     },
 
@@ -519,34 +572,24 @@ export const useStore = create<StoreState>((set, get) => {
     
     saveDataToIndexedDB: async () => {
       try {
-        set({ isLoading: true });
+        const { locations, characters, combats } = get();
         
-        // Save locations.json
-        const locationsResult = await AssetManager.saveDataObject('locations.json', get().locations);
-        if (!locationsResult.success) {
-          set({ isLoading: false });
-          return locationsResult;
+        // Save locations and characters to IndexedDB
+        const saveLocations = await AssetManager.saveDataObject('locations.json', locations);
+        const saveCharacters = await AssetManager.saveDataObject('characters.json', characters);
+        const saveCombats = await AssetManager.saveDataObject('combats.json', combats);
+        
+        if (saveLocations.success && saveCharacters.success && saveCombats.success) {
+          return { success: true, message: 'Data saved successfully' };
+        } else {
+          return { 
+            success: false, 
+            message: `Error saving data: ${saveLocations.message}, ${saveCharacters.message}, ${saveCombats.message}` 
+          };
         }
-        
-        // Save characters.json
-        const charactersResult = await AssetManager.saveDataObject('characters.json', get().characters);
-        if (!charactersResult.success) {
-          set({ isLoading: false });
-          return charactersResult;
-        }
-        
-        set({ isLoading: false });
-        return { 
-          success: true, 
-          message: 'Successfully saved all data to IndexedDB.' 
-        };
       } catch (error) {
         console.error('Error saving data to IndexedDB:', error);
-        set({ isLoading: false });
-        return { 
-          success: false, 
-          message: `Error saving data: ${error instanceof Error ? error.message : String(error)}` 
-        };
+        return { success: false, message: 'Error saving data to IndexedDB' };
       }
     },
     

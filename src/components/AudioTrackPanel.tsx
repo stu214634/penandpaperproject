@@ -69,13 +69,16 @@ export const AudioTrackPanel: React.FC = () => {
       bottom: 20,
       left: 20,
       p: 2,
-      maxWidth: 320,
-      maxHeight: '300px',
+      width: 320,
+      maxHeight: '250px',
       overflowY: 'auto',
       backgroundColor: 'rgba(45, 45, 45, 0.9)',
-      zIndex: 1000,
+      zIndex: 1300,
       borderRadius: '8px',
       boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
+      '&:hover': {
+        backgroundColor: 'rgba(50, 50, 50, 0.95)',
+      },
     }}>
       <Typography variant="h6" gutterBottom>
         Audio Controls

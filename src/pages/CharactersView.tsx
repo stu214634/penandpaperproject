@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -24,7 +24,12 @@ import {
   List,
   ListItem,
   ListItemText,
-  ListItemSecondaryAction
+  ListItemSecondaryAction,
+  Alert,
+  CircularProgress,
+  Tabs,
+  Tab,
+  Autocomplete
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
@@ -34,8 +39,13 @@ import PersonIcon from '@mui/icons-material/Person';
 import StoreIcon from '@mui/icons-material/Store';
 import InventoryIcon from '@mui/icons-material/Inventory';
 import PlaceIcon from '@mui/icons-material/Place';
+import SportsKabaddiIcon from '@mui/icons-material/SportsKabaddi';
+import VideogameAssetIcon from '@mui/icons-material/VideogameAsset';
+import ReactMarkdown from 'react-markdown';
 import { useStore } from '../store';
 import { AudioTrackPanel } from '../components/AudioTrackPanel';
+import { AssetManager } from '../services/assetManager';
+import { Character } from '../store';
 
 export const CharactersView: React.FC = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -43,6 +53,7 @@ export const CharactersView: React.FC = () => {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [imageAssets, setImageAssets] = useState<string[]>([]);
   
   const { 
     characters, 
@@ -57,21 +68,47 @@ export const CharactersView: React.FC = () => {
   const [newCharacter, setNewCharacter] = useState({
     name: '',
     description: '',
-    type: 'npc' as 'npc' | 'merchant',
-    locationId: ''
+    type: 'npc' as 'npc' | 'merchant' | 'enemy' | 'player',
+    locationId: '',
+    descriptionType: 'markdown' as 'markdown' | 'image' | 'pdf',
+    descriptionAssetName: '',
+    hp: 10  // Default HP value
   });
   
   // Currently editing character id
   const [editingCharacter, setEditingCharacter] = useState<string | null>(null);
   
+  // Load image assets
+  useEffect(() => {
+    if (isAddDialogOpen || isEditDialogOpen) {
+      const loadAssets = async () => {
+        const imageAssetsData = await AssetManager.getAssets('images');
+        setImageAssets(imageAssetsData.map(asset => asset.name));
+      };
+      loadAssets();
+    }
+  }, [isAddDialogOpen, isEditDialogOpen]);
+  
   // Add a new character
   const handleAddCharacter = () => {
-    addCharacter({
+    const character: Omit<Character, 'id'> = {
       name: newCharacter.name,
       description: newCharacter.description,
       type: newCharacter.type,
-      locationId: newCharacter.locationId
-    });
+      hp: Number(newCharacter.hp) || 1  // Cast to number and provide fallback
+    };
+    
+    if (newCharacter.locationId) {
+      character.locationId = newCharacter.locationId;
+    }
+    
+    character.descriptionType = newCharacter.descriptionType;
+    
+    if (newCharacter.descriptionAssetName) {
+      character.descriptionAssetName = newCharacter.descriptionAssetName;
+    }
+    
+    addCharacter(character);
     
     setIsAddDialogOpen(false);
     resetCharacterForm();
@@ -84,7 +121,10 @@ export const CharactersView: React.FC = () => {
       name: '',
       description: '',
       type: 'npc',
-      locationId: ''
+      locationId: '',
+      descriptionType: 'markdown',
+      descriptionAssetName: '',
+      hp: 10
     });
   };
   
@@ -97,7 +137,10 @@ export const CharactersView: React.FC = () => {
         name: character.name,
         description: character.description,
         type: character.type,
-        locationId: character.locationId || ''
+        locationId: character.locationId || '',
+        descriptionType: character.descriptionType || 'markdown',
+        descriptionAssetName: character.descriptionAssetName || '',
+        hp: character.hp
       });
       setIsEditDialogOpen(true);
     }
@@ -106,16 +149,26 @@ export const CharactersView: React.FC = () => {
   // Save edited character
   const handleSaveCharacter = () => {
     if (editingCharacter) {
-      updateCharacter(editingCharacter, {
+      const characterUpdate: Partial<Omit<Character, 'id'>> = {
         name: newCharacter.name,
         description: newCharacter.description,
         type: newCharacter.type,
-        locationId: newCharacter.locationId
-      });
+        hp: Number(newCharacter.hp) || 1,  // Cast to number and provide fallback
+        descriptionType: newCharacter.descriptionType
+      };
+      
+      if (newCharacter.locationId) {
+        characterUpdate.locationId = newCharacter.locationId;
+      }
+      
+      if (newCharacter.descriptionAssetName) {
+        characterUpdate.descriptionAssetName = newCharacter.descriptionAssetName;
+      }
+      
+      updateCharacter(editingCharacter, characterUpdate);
       
       setIsEditDialogOpen(false);
       resetCharacterForm();
-      setEditingCharacter(null);
       showSnackbar('Character updated successfully');
     }
   };
@@ -153,13 +206,13 @@ export const CharactersView: React.FC = () => {
   };
   
   // Render a character card
-  const renderCharacterCard = (character: any) => {
+  const renderCharacterCard = (character: Character) => {
     const location = character.locationId 
       ? locations.find(loc => loc.id === character.locationId)
       : null;
       
     return (
-      <Grid item xs={12} sm={6} md={4} key={character.id}>
+      <Grid item xs={12} sm={6} md={5} key={character.id}>
         <Card>
           <CardContent>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -170,10 +223,24 @@ export const CharactersView: React.FC = () => {
                 
                 <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
                   <Chip
-                    icon={character.type === 'npc' ? <PersonIcon /> : <StoreIcon />}
-                    label={character.type === 'npc' ? 'NPC' : 'Merchant'}
+                    icon={
+                      character.type === 'npc' ? <PersonIcon /> : 
+                      character.type === 'merchant' ? <StoreIcon /> : 
+                      character.type === 'enemy' ? <SportsKabaddiIcon /> :
+                      <VideogameAssetIcon />
+                    }
+                    label={
+                      character.type === 'npc' ? 'NPC' : 
+                      character.type === 'merchant' ? 'Merchant' : 
+                      character.type === 'enemy' ? 'Enemy' : 'Player'
+                    }
                     size="small"
-                    color={character.type === 'npc' ? 'primary' : 'secondary'}
+                    color={
+                      character.type === 'npc' ? 'primary' : 
+                      character.type === 'merchant' ? 'secondary' : 
+                      character.type === 'enemy' ? 'error' : 
+                      'success'
+                    }
                     variant="outlined"
                   />
                   
@@ -187,9 +254,16 @@ export const CharactersView: React.FC = () => {
                       sx={{ ml: 1 }}
                     />
                   )}
+                  <Chip
+                    label={`HP: ${character.hp}`}
+                    size="small"
+                    color="default"
+                    variant="outlined"
+                    sx={{ ml: 1 }}
+                  />
                 </Box>
                 
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1, mb: 2 }}>
                   {character.description}
                 </Typography>
                 
@@ -250,7 +324,7 @@ export const CharactersView: React.FC = () => {
             disabled={isSaving}
             sx={{ mr: 2 }}
           >
-            {isSaving ? 'Saving...' : 'Save Changes'}
+            {isSaving ? <CircularProgress size={24} /> : 'Save Changes'}
           </Button>
           
           <Button 
@@ -310,45 +384,136 @@ export const CharactersView: React.FC = () => {
                   label="Character Type"
                   onChange={(e) => setNewCharacter({ 
                     ...newCharacter, 
-                    type: e.target.value as 'npc' | 'merchant' 
+                    type: e.target.value as 'npc' | 'merchant' | 'enemy' | 'player' 
                   })}
                 >
                   <MenuItem value="npc">NPC</MenuItem>
                   <MenuItem value="merchant">Merchant</MenuItem>
+                  <MenuItem value="enemy">Enemy</MenuItem>
+                  <MenuItem value="play">Player Character</MenuItem>
                 </Select>
               </FormControl>
             </Grid>
             
-            <Grid item xs={12} md={6}>
-              <FormControl fullWidth>
-                <InputLabel>Location</InputLabel>
-                <Select
-                  value={newCharacter.locationId}
-                  label="Location"
-                  onChange={(e) => setNewCharacter({ 
-                    ...newCharacter, 
-                    locationId: e.target.value as string 
-                  })}
-                  displayEmpty
-                >
-                  <MenuItem value="">No Location</MenuItem>
-                  {locations.map((location) => (
-                    <MenuItem key={location.id} value={location.id}>{location.name}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+            <Grid item xs={12} md={4}>
+              <TextField
+                label="Hit Points (HP)"
+                type="number"
+                fullWidth
+                value={newCharacter.hp}
+                onChange={(e) => setNewCharacter({ 
+                  ...newCharacter, 
+                  hp: parseInt(e.target.value) || 1 
+                })}
+                inputProps={{ min: 1 }}
+              />
             </Grid>
             
             <Grid item xs={12}>
-              <TextField
-                label="Description"
-                fullWidth
-                multiline
-                rows={4}
-                value={newCharacter.description}
-                onChange={(e) => setNewCharacter({ ...newCharacter, description: e.target.value })}
+              <Autocomplete
+                options={locations}
+                value={locations.find(loc => loc.id === newCharacter.locationId) || null}
+                onChange={(_, newValue) => setNewCharacter({ 
+                  ...newCharacter, 
+                  locationId: newValue?.id || '' 
+                })}
+                getOptionLabel={(option) => option.name}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Location"
+                    fullWidth
+                  />
+                )}
+                isOptionEqualToValue={(option, value) => option.id === value.id}
               />
             </Grid>
+            
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel>Description Type</InputLabel>
+                <Select
+                  value={newCharacter.descriptionType}
+                  label="Description Type"
+                  onChange={(e) => setNewCharacter({ 
+                    ...newCharacter, 
+                    descriptionType: e.target.value as 'markdown' | 'image' | 'pdf' 
+                  })}
+                >
+                  <MenuItem value="markdown">Markdown</MenuItem>
+                  <MenuItem value="image">Image</MenuItem>
+                  <MenuItem value="pdf">PDF</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            
+            {newCharacter.descriptionType === 'markdown' ? (
+              <>
+                <Grid item xs={12}>
+                  <TextField
+                    label="Description"
+                    multiline
+                    rows={6}
+                    fullWidth
+                    value={newCharacter.description}
+                    onChange={(e) => setNewCharacter({ ...newCharacter, description: e.target.value })}
+                  />
+                </Grid>
+                
+                <Grid item xs={12}>
+                  <Typography variant="subtitle2" sx={{ mt: 1, mb: 1 }}>
+                    Preview
+                  </Typography>
+                  <Paper 
+                    sx={{ 
+                      p: 2, 
+                      height: '200px', 
+                      overflow: 'auto',
+                      bgcolor: 'background.default',
+                      border: 1,
+                      borderColor: 'divider'
+                    }}
+                  >
+                    <ReactMarkdown>
+                      {newCharacter.description}
+                    </ReactMarkdown>
+                  </Paper>
+                </Grid>
+              </>
+            ) : newCharacter.descriptionType === 'image' || newCharacter.descriptionType === 'pdf' ? (
+              <>
+                <Grid item xs={12}>
+                  <Autocomplete
+                    options={imageAssets}
+                    value={newCharacter.descriptionAssetName || null}
+                    onChange={(_, newValue) => setNewCharacter({ 
+                      ...newCharacter, 
+                      descriptionAssetName: newValue || '' 
+                    })}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        label="Description Asset"
+                        fullWidth
+                        helperText={`Select a ${newCharacter.descriptionType} file from assets`}
+                      />
+                    )}
+                  />
+                </Grid>
+                
+                <Grid item xs={12}>
+                  <TextField
+                    label="Brief Description"
+                    multiline
+                    rows={3}
+                    fullWidth
+                    value={newCharacter.description}
+                    onChange={(e) => setNewCharacter({ ...newCharacter, description: e.target.value })}
+                    helperText="Add a brief description text to show in lists"
+                  />
+                </Grid>
+              </>
+            ) : null}
           </Grid>
         </DialogContent>
         <DialogActions>
@@ -385,45 +550,136 @@ export const CharactersView: React.FC = () => {
                   label="Character Type"
                   onChange={(e) => setNewCharacter({ 
                     ...newCharacter, 
-                    type: e.target.value as 'npc' | 'merchant' 
+                    type: e.target.value as 'npc' | 'merchant' | 'enemy' | 'player' 
                   })}
                 >
                   <MenuItem value="npc">NPC</MenuItem>
                   <MenuItem value="merchant">Merchant</MenuItem>
+                  <MenuItem value="enemy">Enemy</MenuItem>
+                  <MenuItem value="play">Player Character</MenuItem>
                 </Select>
               </FormControl>
             </Grid>
             
-            <Grid item xs={12} md={6}>
-              <FormControl fullWidth>
-                <InputLabel>Location</InputLabel>
-                <Select
-                  value={newCharacter.locationId}
-                  label="Location"
-                  onChange={(e) => setNewCharacter({ 
-                    ...newCharacter, 
-                    locationId: e.target.value as string 
-                  })}
-                  displayEmpty
-                >
-                  <MenuItem value="">No Location</MenuItem>
-                  {locations.map((location) => (
-                    <MenuItem key={location.id} value={location.id}>{location.name}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+            <Grid item xs={12} md={4}>
+              <TextField
+                label="Hit Points (HP)"
+                type="number"
+                fullWidth
+                value={newCharacter.hp}
+                onChange={(e) => setNewCharacter({ 
+                  ...newCharacter, 
+                  hp: parseInt(e.target.value) || 1 
+                })}
+                inputProps={{ min: 1 }}
+              />
             </Grid>
             
             <Grid item xs={12}>
-              <TextField
-                label="Description"
-                fullWidth
-                multiline
-                rows={4}
-                value={newCharacter.description}
-                onChange={(e) => setNewCharacter({ ...newCharacter, description: e.target.value })}
+              <Autocomplete
+                options={locations}
+                value={locations.find(loc => loc.id === newCharacter.locationId) || null}
+                onChange={(_, newValue) => setNewCharacter({ 
+                  ...newCharacter, 
+                  locationId: newValue?.id || '' 
+                })}
+                getOptionLabel={(option) => option.name}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Location"
+                    fullWidth
+                  />
+                )}
+                isOptionEqualToValue={(option, value) => option.id === value.id}
               />
             </Grid>
+            
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel>Description Type</InputLabel>
+                <Select
+                  value={newCharacter.descriptionType}
+                  label="Description Type"
+                  onChange={(e) => setNewCharacter({ 
+                    ...newCharacter, 
+                    descriptionType: e.target.value as 'markdown' | 'image' | 'pdf' 
+                  })}
+                >
+                  <MenuItem value="markdown">Markdown</MenuItem>
+                  <MenuItem value="image">Image</MenuItem>
+                  <MenuItem value="pdf">PDF</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            
+            {newCharacter.descriptionType === 'markdown' ? (
+              <>
+                <Grid item xs={12}>
+                  <TextField
+                    label="Description"
+                    multiline
+                    rows={6}
+                    fullWidth
+                    value={newCharacter.description}
+                    onChange={(e) => setNewCharacter({ ...newCharacter, description: e.target.value })}
+                  />
+                </Grid>
+                
+                <Grid item xs={12}>
+                  <Typography variant="subtitle2" sx={{ mt: 1, mb: 1 }}>
+                    Preview
+                  </Typography>
+                  <Paper 
+                    sx={{ 
+                      p: 2, 
+                      height: '200px', 
+                      overflow: 'auto',
+                      bgcolor: 'background.default',
+                      border: 1,
+                      borderColor: 'divider'
+                    }}
+                  >
+                    <ReactMarkdown>
+                      {newCharacter.description}
+                    </ReactMarkdown>
+                  </Paper>
+                </Grid>
+              </>
+            ) : newCharacter.descriptionType === 'image' || newCharacter.descriptionType === 'pdf' ? (
+              <>
+                <Grid item xs={12}>
+                  <Autocomplete
+                    options={imageAssets}
+                    value={newCharacter.descriptionAssetName || null}
+                    onChange={(_, newValue) => setNewCharacter({ 
+                      ...newCharacter, 
+                      descriptionAssetName: newValue || '' 
+                    })}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        label="Description Asset"
+                        fullWidth
+                        helperText={`Select a ${newCharacter.descriptionType} file from assets`}
+                      />
+                    )}
+                  />
+                </Grid>
+                
+                <Grid item xs={12}>
+                  <TextField
+                    label="Brief Description"
+                    multiline
+                    rows={3}
+                    fullWidth
+                    value={newCharacter.description}
+                    onChange={(e) => setNewCharacter({ ...newCharacter, description: e.target.value })}
+                    helperText="Add a brief description text to show in lists"
+                  />
+                </Grid>
+              </>
+            ) : null}
           </Grid>
         </DialogContent>
         <DialogActions>
@@ -443,8 +699,11 @@ export const CharactersView: React.FC = () => {
         open={snackbarOpen}
         autoHideDuration={6000}
         onClose={handleCloseSnackbar}
-        message={snackbarMessage}
-      />
+      >
+        <Alert onClose={handleCloseSnackbar} severity="success" sx={{ width: '100%' }}>
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
       
       {/* Include the AudioTrackPanel */}
       <AudioTrackPanel />
