@@ -9,6 +9,21 @@
       rel="stylesheet"
       href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap"
     />
+    <!-- Handle SPA redirect from 404.html -->
+    <script>
+      (function() {
+        // Check if we have a redirect path stored
+        var redirectPath = localStorage.getItem('redirect_path');
+        if (redirectPath) {
+          // Clear the localStorage
+          localStorage.removeItem('redirect_path');
+          
+          // Use history API to replace the current URL with the target route
+          // This prevents adding a history entry and allows the SPA router to take over
+          history.replaceState(null, null, '/penandpaperproject' + redirectPath);
+        }
+      })();
+    </script>
     <script type="module" crossorigin src="/penandpaperproject/assets/index-BjdPMLmn.js"></script>
     <link rel="modulepreload" crossorigin href="/penandpaperproject/assets/react-vendor-BzdEknB4.js">
     <link rel="modulepreload" crossorigin href="/penandpaperproject/assets/mui-vendor-uU3VvFzt.js">
