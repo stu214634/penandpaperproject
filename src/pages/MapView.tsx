@@ -133,6 +133,9 @@ export const MapView: React.FC = () => {
   // Additional state for the UI
   const [detailsTab, setDetailsTab] = useState(0);
   
+  // Additional state for description dialog
+  const [showDescriptionDialog, setShowDescriptionDialog] = useState(false);
+  
   // Effect to initialize the selected location from the saved state
   useEffect(() => {
     if (locations.length > 0) {
@@ -1313,9 +1316,40 @@ export const MapView: React.FC = () => {
               </Box>
               
               {selectedLocation?.description && (
-                <Typography variant="body2" color="text.secondary">
-                  {selectedLocation.description}
-                </Typography>
+                <Box
+                  onClick={() => setShowDescriptionDialog(true)} 
+                  sx={{ 
+                    cursor: 'pointer',
+                    '&:hover': {
+                      backgroundColor: 'rgba(0, 0, 0, 0.04)'
+                    },
+                    borderRadius: 1,
+                    p: 1
+                  }}
+                >
+                  <Typography 
+                    variant="body2" 
+                    color="text.secondary"
+                    sx={{
+                      display: '-webkit-box',
+                      WebkitLineClamp: 4,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}
+                  >
+                    {selectedLocation.description}
+                  </Typography>
+                  {selectedLocation.description.length > 200 && (
+                    <Typography 
+                      variant="caption" 
+                      color="primary" 
+                      sx={{ display: 'block', mt: 0.5 }}
+                    >
+                      Click to view full description
+                    </Typography>
+                  )}
+                </Box>
               )}
             </Box>
             
@@ -1784,6 +1818,33 @@ export const MapView: React.FC = () => {
         fullWidth
       >
         {renderCombatDetailsPanel()}
+      </Dialog>
+
+      {/* Description Dialog */}
+      <Dialog
+        open={showDescriptionDialog}
+        onClose={() => setShowDescriptionDialog(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          {selectedLocation?.name} - Description
+          <IconButton
+            aria-label="close"
+            onClick={() => setShowDescriptionDialog(false)}
+            sx={{ position: 'absolute', right: 8, top: 8 }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+            {selectedLocation?.description}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowDescriptionDialog(false)}>Close</Button>
+        </DialogActions>
       </Dialog>
     </Box>
   );

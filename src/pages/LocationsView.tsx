@@ -44,6 +44,7 @@ import MusicNoteIcon from '@mui/icons-material/MusicNote';
 import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import HelpIcon from '@mui/icons-material/Help';
 import ImageIcon from '@mui/icons-material/Image';
+import CloseIcon from '@mui/icons-material/Close';
 import { useStore } from '../store';
 import { AssetManager } from '../services/assetManager';
 import { AudioTrackPanel } from '../components/AudioTrackPanel';
@@ -78,6 +79,10 @@ export const LocationsView: React.FC = () => {
   
   // Expanded locations state
   const [expandedLocations, setExpandedLocations] = useState<Record<string, boolean>>({});
+
+  const [showDescriptionDialog, setShowDescriptionDialog] = useState(false);
+  const [viewingLocationDescription, setViewingLocationDescription] = useState<string>("");
+  const [viewingLocationName, setViewingLocationName] = useState<string>("");
 
   const { 
     locations, 
@@ -274,9 +279,45 @@ export const LocationsView: React.FC = () => {
                   </Box>
                 )}
                 
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                  {location.description}
-                </Typography>
+                <Box
+                  onClick={() => {
+                    setViewingLocationDescription(location.description);
+                    setViewingLocationName(location.name);
+                    setShowDescriptionDialog(true);
+                  }}
+                  sx={{ 
+                    cursor: 'pointer',
+                    '&:hover': {
+                      backgroundColor: 'rgba(0, 0, 0, 0.04)'
+                    },
+                    borderRadius: 1,
+                    p: 1,
+                    mt: 1
+                  }}
+                >
+                  <Typography 
+                    variant="body2" 
+                    color="text.secondary" 
+                    sx={{
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}
+                  >
+                    {location.description}
+                  </Typography>
+                  {location.description.length > 100 && (
+                    <Typography 
+                      variant="caption" 
+                      color="primary" 
+                      sx={{ display: 'block', mt: 0.5 }}
+                    >
+                      Click to view full description
+                    </Typography>
+                  )}
+                </Box>
                 
                 <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                   {location.backgroundMusic && (
@@ -732,6 +773,33 @@ export const LocationsView: React.FC = () => {
       
       {/* Include the AudioTrackPanel */}
       <AudioTrackPanel />
+      
+      {/* Description Dialog */}
+      <Dialog
+        open={showDescriptionDialog}
+        onClose={() => setShowDescriptionDialog(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          {viewingLocationName} - Description
+          <IconButton
+            aria-label="close"
+            onClick={() => setShowDescriptionDialog(false)}
+            sx={{ position: 'absolute', right: 8, top: 8 }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+            {viewingLocationDescription}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowDescriptionDialog(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }; 
