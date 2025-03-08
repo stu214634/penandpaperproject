@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Paper, Slider, IconButton, List, ListItem, Divider, Collapse } from '@mui/material';
-import { VolumeOff, VolumeUp, Close, ExpandMore, ExpandLess, Loop, DoNotDisturb } from '@mui/icons-material';
+import { Box, Typography, Paper, Slider, IconButton, List, ListItem, Divider, Collapse, Tooltip, Zoom } from '@mui/material';
+import { VolumeOff, VolumeUp, Close, ExpandMore, ExpandLess, Loop, DoNotDisturb, Minimize, MusicNote } from '@mui/icons-material';
 import { useStore } from '../store';
 import { AudioTrackSelector } from './AudioTrackSelector';
 
@@ -14,6 +14,7 @@ export const AudioTrackPanel: React.FC = () => {
   const [isMasterMuted, setIsMasterMuted] = useState(false);
   const [previousVolume, setPreviousVolume] = useState(volume || 0.7);
   const [expandedTracks, setExpandedTracks] = useState<Record<string, boolean>>({});
+  const [isMinimized, setIsMinimized] = useState(false);
 
   // Update previousVolume when volume changes and not muted
   useEffect(() => {
@@ -62,6 +63,39 @@ export const AudioTrackPanel: React.FC = () => {
       [trackId]: !prev[trackId]
     }));
   };
+  
+  const toggleMinimize = () => {
+    setIsMinimized(!isMinimized);
+  };
+
+  // If minimized, just show a music icon that can be clicked to maximize
+  if (isMinimized) {
+    return (
+      <Tooltip 
+        title="Audio Controls" 
+        placement="top" 
+        TransitionComponent={Zoom}
+      >
+        <IconButton
+          onClick={toggleMinimize}
+          sx={{
+            position: 'fixed',
+            bottom: 20,
+            left: 20,
+            backgroundColor: 'rgba(45, 45, 45, 0.9)',
+            color: 'white',
+            '&:hover': {
+              backgroundColor: 'rgba(60, 60, 60, 0.9)',
+            },
+            zIndex: 9999,
+            boxShadow: '0 4px 10px rgba(0, 0, 0, 0.3)',
+          }}
+        >
+          <MusicNote />
+        </IconButton>
+      </Tooltip>
+    );
+  }
 
   return (
     <Paper sx={{
@@ -69,20 +103,24 @@ export const AudioTrackPanel: React.FC = () => {
       bottom: 20,
       left: 20,
       p: 2,
-      width: 320,
-      maxHeight: '250px',
+      maxWidth: 320,
+      maxHeight: '300px',
       overflowY: 'auto',
       backgroundColor: 'rgba(45, 45, 45, 0.9)',
-      zIndex: 1300,
+      zIndex: 9999, // Highest z-index to ensure it's always on top
       borderRadius: '8px',
       boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
+      transform: 'translateZ(0)', // Forces GPU acceleration for smoother rendering
       '&:hover': {
-        backgroundColor: 'rgba(50, 50, 50, 0.95)',
-      },
+        boxShadow: '0 6px 24px rgba(0, 0, 0, 0.4)', // Enhanced shadow on hover for better visibility
+      }
     }}>
-      <Typography variant="h6" gutterBottom>
-        Audio Controls
-      </Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+        <Typography variant="h6">Audio Controls</Typography>
+        <IconButton size="small" onClick={toggleMinimize}>
+          <Minimize fontSize="small" />
+        </IconButton>
+      </Box>
       
       {/* Track Selector Button */}
       <AudioTrackSelector />
