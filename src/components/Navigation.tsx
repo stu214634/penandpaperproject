@@ -93,7 +93,7 @@ export const Navigation: React.FC = () => {
           )}
           
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            Pen & Paper Project
+            Campaign Organizer
           </Typography>
           
           {!isMobile && (
