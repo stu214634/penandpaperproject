@@ -30,6 +30,7 @@ export interface CustomLocation {
   backgroundMusic?: string;
   entrySound?: string;
   imageUrl?: string;
+  descriptionType?: 'markdown' | 'image' | 'pdf';
   mixWithParent?: boolean;
   coordinates?: [number, number];
   inventory?: Item[];

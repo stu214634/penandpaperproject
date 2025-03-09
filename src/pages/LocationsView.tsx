@@ -49,6 +49,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import { useStore } from '../store';
 import { AssetManager } from '../services/assetManager';
 import { AudioTrackPanel } from '../components/AudioTrackPanel';
+import MarkdownContent from '../components/MarkdownContent';
 
 export const LocationsView: React.FC = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -61,6 +62,7 @@ export const LocationsView: React.FC = () => {
     backgroundMusic: '',
     entrySound: '',
     imageUrl: '',
+    descriptionType: 'markdown' as 'markdown' | 'image' | 'pdf',
     parentLocationId: '',
     coordinates: [0, 0] as [number, number],
     mixWithParent: false,
@@ -122,6 +124,7 @@ export const LocationsView: React.FC = () => {
       backgroundMusic: newLocation.backgroundMusic || undefined,
       entrySound: newLocation.entrySound || undefined,
       imageUrl: newLocation.imageUrl || undefined,
+      descriptionType: newLocation.descriptionType,
       coordinates: newLocation.coordinates.every(coord => coord !== 0) ? newLocation.coordinates : undefined,
       parentLocationId: newLocation.parentLocationId || undefined,
       mixWithParent: newLocation.mixWithParent,
@@ -134,12 +137,13 @@ export const LocationsView: React.FC = () => {
   };
   
   const resetNewLocationForm = () => {
-    setNewLocation({
-      name: '',
-      description: '',
-      backgroundMusic: '',
+    setNewLocation({ 
+      name: '', 
+      description: '', 
+      backgroundMusic: '', 
       entrySound: '',
       imageUrl: '',
+      descriptionType: 'markdown' as 'markdown' | 'image' | 'pdf',
       parentLocationId: '',
       coordinates: [0, 0],
       mixWithParent: false,
@@ -165,6 +169,7 @@ export const LocationsView: React.FC = () => {
         backgroundMusic: location.backgroundMusic || '',
         entrySound: location.entrySound || '',
         imageUrl: location.imageUrl || '',
+        descriptionType: location.descriptionType || 'markdown',
         parentLocationId: location.parentLocationId || '',
         coordinates: location.coordinates || [0, 0],
         mixWithParent: location.mixWithParent || false,
@@ -183,6 +188,7 @@ export const LocationsView: React.FC = () => {
         backgroundMusic: newLocation.backgroundMusic || undefined,
         entrySound: newLocation.entrySound || undefined,
         imageUrl: newLocation.imageUrl || undefined,
+        descriptionType: newLocation.descriptionType,
         coordinates: newLocation.coordinates.every(coord => coord !== 0) ? newLocation.coordinates : undefined,
         parentLocationId: newLocation.parentLocationId || undefined,
         mixWithParent: newLocation.mixWithParent,
@@ -301,9 +307,7 @@ export const LocationsView: React.FC = () => {
                     mt: 1
                   }}
                 >
-                  <Typography 
-                    variant="body2" 
-                    color="text.secondary" 
+                  <Box 
                     sx={{
                       display: '-webkit-box',
                       WebkitLineClamp: 2,
@@ -312,8 +316,23 @@ export const LocationsView: React.FC = () => {
                       textOverflow: 'ellipsis'
                     }}
                   >
-                    {location.description}
-                  </Typography>
+                    <MarkdownContent 
+                      content={location.description} 
+                      sx={{
+                        '& table': {
+                          display: 'block',
+                          maxWidth: '100%',
+                          overflow: 'auto',
+                          whiteSpace: 'nowrap',
+                        },
+                        '& th, & td': {
+                          px: 1,
+                          py: 0.5,
+                          fontSize: '0.8rem',
+                        }
+                      }}
+                    />
+                  </Box>
                   {location.description.length > 100 && (
                     <Typography 
                       variant="caption" 
@@ -373,6 +392,22 @@ export const LocationsView: React.FC = () => {
                           .map((id: string) => locations.find(loc => loc.id === id)?.name || 'Unknown')
                           .join(', ');
                         alert(`Connected to: ${connectedNames}`);
+                      }}
+                    />
+                  )}
+
+                  {hasSublocations && (
+                    <Chip 
+                      label={`${sublocations.length} Sublocations`}
+                      size="small"
+                      color="success"
+                      variant="outlined"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const sublocationNames = sublocations
+                          .map((loc: any) => loc.name)
+                          .join(', ');
+                        alert(`Sublocations: ${sublocationNames}`);
                       }}
                     />
                   )}
@@ -509,8 +544,43 @@ export const LocationsView: React.FC = () => {
             </Grid>
             
             <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel>Description Type</InputLabel>
+                <Select
+                  value={newLocation.descriptionType}
+                  label="Description Type"
+                  onChange={(e) => setNewLocation({ 
+                    ...newLocation, 
+                    descriptionType: e.target.value as 'markdown' | 'image' | 'pdf' 
+                  })}
+                >
+                  <MenuItem value="markdown">Markdown</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            
+            <Grid item xs={12}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                <Typography variant="subtitle2">Description</Typography>
+                <Tooltip title={
+                  <>
+                    <Typography variant="caption" sx={{ display: 'block', fontWeight: 'bold' }}>
+                      Markdown Table Example:
+                    </Typography>
+                    <Typography variant="caption" component="pre" sx={{ display: 'block', mt: 1, fontFamily: 'monospace' }}>
+                      | Header 1 | Header 2 | Header 3 |\n
+                      | -------- | -------- | -------- |\n
+                      | Cell 1   | Cell 2   | Cell 3   |\n
+                      | Cell 4   | Cell 5   | Cell 6   |
+                    </Typography>
+                  </>
+                }>
+                  <IconButton size="small" sx={{ ml: 1 }}>
+                    <HelpIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </Box>
               <TextField
-                label="Description"
                 fullWidth
                 multiline
                 rows={3}
@@ -519,6 +589,26 @@ export const LocationsView: React.FC = () => {
               />
             </Grid>
 
+            {newLocation.descriptionType === 'markdown' && (
+              <Grid item xs={12}>
+                <Typography variant="subtitle2" sx={{ mt: 1, mb: 1 }}>
+                  Preview
+                </Typography>
+                <Paper 
+                  sx={{ 
+                    p: 2, 
+                    height: '200px', 
+                    overflow: 'auto',
+                    bgcolor: 'background.default',
+                    border: 1,
+                    borderColor: 'divider'
+                  }}
+                >
+                  <MarkdownContent content={newLocation.description} />
+                </Paper>
+              </Grid>
+            )}
+            
             <Grid item xs={12}>
               <Autocomplete
                 multiple
@@ -707,8 +797,43 @@ export const LocationsView: React.FC = () => {
             </Grid>
             
             <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel>Description Type</InputLabel>
+                <Select
+                  value={newLocation.descriptionType}
+                  label="Description Type"
+                  onChange={(e) => setNewLocation({ 
+                    ...newLocation, 
+                    descriptionType: e.target.value as 'markdown' | 'image' | 'pdf' 
+                  })}
+                >
+                  <MenuItem value="markdown">Markdown</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            
+            <Grid item xs={12}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                <Typography variant="subtitle2">Description</Typography>
+                <Tooltip title={
+                  <>
+                    <Typography variant="caption" sx={{ display: 'block', fontWeight: 'bold' }}>
+                      Markdown Table Example:
+                    </Typography>
+                    <Typography variant="caption" component="pre" sx={{ display: 'block', mt: 1, fontFamily: 'monospace' }}>
+                      | Header 1 | Header 2 | Header 3 |\n
+                      | -------- | -------- | -------- |\n
+                      | Cell 1   | Cell 2   | Cell 3   |\n
+                      | Cell 4   | Cell 5   | Cell 6   |
+                    </Typography>
+                  </>
+                }>
+                  <IconButton size="small" sx={{ ml: 1 }}>
+                    <HelpIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </Box>
               <TextField
-                label="Description"
                 fullWidth
                 multiline
                 rows={3}
@@ -717,6 +842,26 @@ export const LocationsView: React.FC = () => {
               />
             </Grid>
 
+            {newLocation.descriptionType === 'markdown' && (
+              <Grid item xs={12}>
+                <Typography variant="subtitle2" sx={{ mt: 1, mb: 1 }}>
+                  Preview
+                </Typography>
+                <Paper 
+                  sx={{ 
+                    p: 2, 
+                    height: '200px', 
+                    overflow: 'auto',
+                    bgcolor: 'background.default',
+                    border: 1,
+                    borderColor: 'divider'
+                  }}
+                >
+                  <MarkdownContent content={newLocation.description} />
+                </Paper>
+              </Grid>
+            )}
+            
             <Grid item xs={12}>
               <Autocomplete
                 multiple
@@ -899,9 +1044,7 @@ export const LocationsView: React.FC = () => {
           </IconButton>
         </DialogTitle>
         <DialogContent dividers>
-          <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
-            {viewingLocationDescription}
-          </Typography>
+          <MarkdownContent content={viewingLocationDescription} />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setShowDescriptionDialog(false)}>Close</Button>

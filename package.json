@@ -26,6 +26,7 @@
     "react-markdown": "^10.1.0",
     "react-router-dom": "^6.21.3",
     "react-zoom-pan-pinch": "^3.7.0",
+    "remark-gfm": "^4.0.1",
     "uuid": "^11.1.0",
     "zustand": "^4.5.0"
   },

@@ -40,7 +40,8 @@ import {
   Tabs,
   Tab,
   Chip,
-  Autocomplete
+  Autocomplete,
+  Fab
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import AddIcon from '@mui/icons-material/Add';
@@ -70,8 +71,10 @@ import {
   Person as PersonIcon,
   Store as MerchantIcon,
   ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon
+  ExpandLess as ExpandLessIcon,
+  Code as CodeIcon
 } from '@mui/icons-material';
+import MarkdownContent from '../components/MarkdownContent';
 
 export const MapView: React.FC = () => {
   const navigate = useNavigate();
@@ -707,7 +710,44 @@ export const MapView: React.FC = () => {
                      npc.type === 'merchant' ? <MerchantIcon fontSize="small" /> :
                      <SportsKabaddiIcon color="error" fontSize="small" />}
                   </ListItemIcon>
-                  <ListItemText primary={npc.name} secondary={npc.description} />
+                  <ListItemText 
+                    primary={
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        {npc.name}
+                        {npc.descriptionType === 'markdown' && (
+                          <Tooltip title="Uses Markdown formatting">
+                            <Box component="span" sx={{ display: 'flex', ml: 1, color: 'text.secondary' }}>
+                              <CodeIcon fontSize="small" />
+                            </Box>
+                          </Tooltip>
+                        )}
+                      </Box>
+                    } 
+                    secondary={
+                      <Box sx={{ 
+                        display: '-webkit-box', 
+                        WebkitLineClamp: 2, 
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                        lineHeight: 1.2,
+                        fontSize: '0.875rem'
+                      }}>
+                        {npc.descriptionType === 'markdown' ? (
+                          <MarkdownContent 
+                            content={npc.description.length > 80 ? `${npc.description.substring(0, 80)}...` : npc.description} 
+                            sx={{ 
+                              fontSize: '0.8rem', 
+                              lineHeight: 1.2,
+                              '& h1, & h2, & h3, & h4, & h5, & h6': { fontSize: '0.9rem', my: 0.5 },
+                              '& p': { my: 0.5 }
+                            }}
+                          />
+                        ) : (
+                          npc.description.length > 80 ? `${npc.description.substring(0, 80)}...` : npc.description
+                        )}
+                      </Box>
+                    }
+                  />
                 </ListItem>
               ))}
               {hasSublocationsWithNpcs && <Divider sx={{ my: 1 }} />}
@@ -764,7 +804,44 @@ export const MapView: React.FC = () => {
                          npc.type === 'merchant' ? <MerchantIcon fontSize="small" /> :
                          <SportsKabaddiIcon color="error" fontSize="small" />}
                       </ListItemIcon>
-                      <ListItemText primary={npc.name} />
+                      <ListItemText 
+                        primary={
+                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            {npc.name}
+                            {npc.descriptionType === 'markdown' && (
+                              <Tooltip title="Uses Markdown formatting">
+                                <Box component="span" sx={{ display: 'flex', ml: 1, color: 'text.secondary' }}>
+                                  <CodeIcon fontSize="small" />
+                                </Box>
+                              </Tooltip>
+                            )}
+                          </Box>
+                        } 
+                        secondary={
+                          <Box sx={{ 
+                            display: '-webkit-box', 
+                            WebkitLineClamp: 2, 
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                            lineHeight: 1.2,
+                            fontSize: '0.875rem'
+                          }}>
+                            {npc.descriptionType === 'markdown' ? (
+                              <MarkdownContent 
+                                content={npc.description.length > 80 ? `${npc.description.substring(0, 80)}...` : npc.description} 
+                                sx={{ 
+                                  fontSize: '0.8rem', 
+                                  lineHeight: 1.2,
+                                  '& h1, & h2, & h3, & h4, & h5, & h6': { fontSize: '0.9rem', my: 0.5 },
+                                  '& p': { my: 0.5 }
+                                }}
+                              />
+                            ) : (
+                              npc.description.length > 80 ? `${npc.description.substring(0, 80)}...` : npc.description
+                            )}
+                          </Box>
+                        }
+                      />
                     </ListItem>
                   ))}
                 </List>
@@ -833,7 +910,16 @@ export const MapView: React.FC = () => {
         
         <Typography variant="subtitle1" color="text.secondary">{selectedNpc.type === 'npc' ? 'NPC' : 
          selectedNpc.type === 'merchant' ? 'Merchant' : 'Enemy'}</Typography>
-        <Typography variant="body2" paragraph>{selectedNpc.description}</Typography>
+        
+        {/* Render character description with Markdown support */}
+        {selectedNpc.descriptionType === 'markdown' && (
+          <Box sx={{ mt: 1, mb: 2 }}>
+            <MarkdownContent content={selectedNpc.description} />
+          </Box>
+        )}
+        {(!selectedNpc.descriptionType || selectedNpc.descriptionType !== 'markdown') && (
+          <Typography variant="body2" paragraph>{selectedNpc.description}</Typography>
+        )}
         
         <Box sx={{ mb: 2 }}>
           <Typography variant="subtitle2">Location:</Typography>
@@ -1000,8 +1086,48 @@ export const MapView: React.FC = () => {
                     <SportsKabaddiIcon color="primary" fontSize="small" />
                   </ListItemIcon>
                   <ListItemText 
-                    primary={combat.name} 
-                    secondary={`Difficulty: ${combat.difficulty || 'Medium'}`} 
+                    primary={
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        {combat.name}
+                        {combat.descriptionType === 'markdown' && (
+                          <Tooltip title="Uses Markdown formatting">
+                            <Box component="span" sx={{ display: 'flex', ml: 1, color: 'text.secondary' }}>
+                              <CodeIcon fontSize="small" />
+                            </Box>
+                          </Tooltip>
+                        )}
+                      </Box>
+                    }
+                    secondary={
+                      <Box sx={{ 
+                        display: 'flex', 
+                        alignItems: 'center',
+                        gap: 0.5
+                      }}>
+                        <Chip size="small" label={`Difficulty: ${combat.difficulty || 'Medium'}`} variant="outlined" />
+                        {combat.description && combat.descriptionType === 'markdown' && (
+                          <Box sx={{ 
+                            display: '-webkit-box', 
+                            WebkitLineClamp: 1, 
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                            lineHeight: 1.2,
+                            fontSize: '0.8rem',
+                            flex: 1
+                          }}>
+                            <MarkdownContent 
+                              content={combat.description.length > 40 ? `${combat.description.substring(0, 40)}...` : combat.description}
+                              sx={{ 
+                                fontSize: '0.8rem', 
+                                lineHeight: 1.2,
+                                '& h1, & h2, & h3, & h4, & h5, & h6': { fontSize: '0.9rem', my: 0.5 },
+                                '& p': { my: 0.5 }
+                              }}
+                            />
+                          </Box>
+                        )}
+                      </Box>
+                    }
                   />
                 </ListItem>
               ))}
@@ -1058,8 +1184,48 @@ export const MapView: React.FC = () => {
                         <SportsKabaddiIcon color="primary" fontSize="small" />
                       </ListItemIcon>
                       <ListItemText 
-                        primary={combat.name}
-                        secondary={`Difficulty: ${combat.difficulty || 'Medium'}`} 
+                        primary={
+                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            {combat.name}
+                            {combat.descriptionType === 'markdown' && (
+                              <Tooltip title="Uses Markdown formatting">
+                                <Box component="span" sx={{ display: 'flex', ml: 1, color: 'text.secondary' }}>
+                                  <CodeIcon fontSize="small" />
+                                </Box>
+                              </Tooltip>
+                            )}
+                          </Box>
+                        }
+                        secondary={
+                          <Box sx={{ 
+                            display: 'flex', 
+                            alignItems: 'center',
+                            gap: 0.5
+                          }}>
+                            <Chip size="small" label={`Difficulty: ${combat.difficulty || 'Medium'}`} variant="outlined" />
+                            {combat.description && combat.descriptionType === 'markdown' && (
+                              <Box sx={{ 
+                                display: '-webkit-box', 
+                                WebkitLineClamp: 1, 
+                                WebkitBoxOrient: 'vertical',
+                                overflow: 'hidden',
+                                lineHeight: 1.2,
+                                fontSize: '0.8rem',
+                                flex: 1
+                              }}>
+                                <MarkdownContent 
+                                  content={combat.description.length > 40 ? `${combat.description.substring(0, 40)}...` : combat.description}
+                                  sx={{ 
+                                    fontSize: '0.8rem', 
+                                    lineHeight: 1.2,
+                                    '& h1, & h2, & h3, & h4, & h5, & h6': { fontSize: '0.9rem', my: 0.5 },
+                                    '& p': { my: 0.5 }
+                                  }}
+                                />
+                              </Box>
+                            )}
+                          </Box>
+                        }
                       />
                     </ListItem>
                   ))}
@@ -1073,7 +1239,7 @@ export const MapView: React.FC = () => {
       </>
     );
   };
-  
+
   // Render the combat details panel
   const renderCombatDetailsPanel = () => {
     if (!selectedCombat) return null;
@@ -1092,7 +1258,16 @@ export const MapView: React.FC = () => {
         <Typography variant="subtitle1" color="text.secondary">
           Difficulty: {selectedCombat.difficulty || 'Medium'}
         </Typography>
-        <Typography variant="body2" paragraph>{selectedCombat.description}</Typography>
+        
+        {/* Render combat description with Markdown support */}
+        {selectedCombat.descriptionType === 'markdown' && (
+          <Box sx={{ mt: 1, mb: 2 }}>
+            <MarkdownContent content={selectedCombat.description} />
+          </Box>
+        )}
+        {(!selectedCombat.descriptionType || selectedCombat.descriptionType !== 'markdown') && (
+          <Typography variant="body2" paragraph>{selectedCombat.description}</Typography>
+        )}
         
         <Box sx={{ mb: 2 }}>
           <Typography variant="subtitle2">Location:</Typography>
@@ -1328,9 +1503,7 @@ export const MapView: React.FC = () => {
                     p: 1
                   }}
                 >
-                  <Typography 
-                    variant="body2" 
-                    color="text.secondary"
+                  <Box
                     sx={{
                       display: '-webkit-box',
                       WebkitLineClamp: 4,
@@ -1339,8 +1512,8 @@ export const MapView: React.FC = () => {
                       textOverflow: 'ellipsis'
                     }}
                   >
-                    {selectedLocation.description}
-                  </Typography>
+                    <MarkdownContent content={selectedLocation.description} />
+                  </Box>
                   {selectedLocation.description.length > 200 && (
                     <Typography 
                       variant="caption" 
@@ -1429,7 +1602,31 @@ export const MapView: React.FC = () => {
                               size="small"
                               color="info"
                               variant="outlined"
-                              onClick={() => handleLocationClick(connectedLoc, {} as React.MouseEvent)}
+                              onClick={(e) => handleLocationClick(connectedLoc, e)}
+                            />
+                          );
+                        })}
+                      </Box>
+                    </Box>
+                  )}
+
+                  {selectedLocation?.sublocations && selectedLocation.sublocations.length > 0 && (
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="subtitle2">Sublocations:</Typography>
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
+                        {selectedLocation.sublocations.map(loc => {
+                          const subloc = locations.find(l => l.id === loc.id);
+                          if (!subloc) return null;
+                          
+                          return (
+                            <Chip 
+                              key={loc.id}
+                              icon={<PlaceIcon />}
+                              label={subloc.name}
+                              size="small"
+                              color="info"
+                              variant="outlined"
+                              onClick={(e) => handleLocationClick(subloc, e)}
                             />
                           );
                         })}
@@ -1459,6 +1656,7 @@ export const MapView: React.FC = () => {
           overflow: 'hidden',
           backgroundColor: 'black',
           zIndex: 1,
+          cursor: editMode ? 'crosshair' : 'default'
         }}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
@@ -1789,14 +1987,83 @@ export const MapView: React.FC = () => {
           </IconButton>
         </DialogTitle>
         <DialogContent dividers>
-          <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
-            {selectedLocation?.description}
-          </Typography>
+          <MarkdownContent content={selectedLocation?.description || ''} />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setShowDescriptionDialog(false)}>Close</Button>
         </DialogActions>
       </Dialog>
+
+      <AudioTrackPanel />
+
+      {/* Edit mode indicator */}
+      {editMode && (
+        <Paper
+          elevation={4}
+          sx={{
+            position: 'absolute',
+            top: 16,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 1100,
+            padding: '8px 16px',
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            color: 'white',
+            borderRadius: 2,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1
+          }}
+        >
+          <EditIcon fontSize="small" />
+          <Typography variant="subtitle2">Edit Mode Active</Typography>
+        </Paper>
+      )}
+
+      {/* Floating action button for Edit Mode */}
+      <Tooltip
+        title={editMode ? 
+          "Exit Edit Mode" : 
+          "Enter Edit Mode to add, edit, and reposition locations on the map"
+        }
+        placement="left"
+      >
+        <Fab
+          color={editMode ? "secondary" : "primary"}
+          aria-label="edit mode"
+          sx={{
+            position: 'absolute',
+            bottom: 16,
+            right: 16,
+            zIndex: 1100,
+          }}
+          onClick={toggleEditMode}
+        >
+          {editMode ? <SaveIcon /> : <EditIcon />}
+        </Fab>
+      </Tooltip>
+      
+      {/* Save button when in edit mode */}
+      {editMode && (
+        <Tooltip
+          title="Save all changes to your campaign"
+          placement="left"
+        >
+          <Fab
+            color="success"
+            aria-label="save changes"
+            sx={{
+              position: 'absolute',
+              bottom: 16,
+              right: 96, // Position it to the left of the edit button
+              zIndex: 1100,
+            }}
+            onClick={handleSaveData}
+          >
+            <SaveIcon />
+          </Fab>
+        </Tooltip>
+      )}
     </Box>
   );
 }; 

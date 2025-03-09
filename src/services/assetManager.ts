@@ -314,6 +314,81 @@ export class AssetManager {
     }
   }
   
+  // Helper function to safely encode Unicode strings to Base64
+  private static encodeUnicode(str: string): string {
+    // Use the built-in btoa function, but first encode the string as UTF-8
+    return window.btoa(unescape(encodeURIComponent(str)));
+  }
+
+  // Helper function to safely decode Base64 to Unicode strings
+  private static decodeUnicode(base64: string): string {
+    try {
+      // Decode base64 to a UTF-8 string
+      return decodeURIComponent(escape(window.atob(base64)));
+    } catch (error) {
+      // Fallback to direct decode for backward compatibility
+      console.warn('Failed to decode with Unicode method, trying direct decode');
+      try {
+        return window.atob(base64);
+      } catch (directError) {
+        // If that fails too, try one more fallback
+        console.warn('Direct decode failed too, returning as-is');
+        return base64;
+      }
+    }
+  }
+
+  // Add or update a data object (converts it to JSON and stores it)
+  static async saveDataObject<T>(name: string, data: T): Promise<{ success: boolean; message: string }> {
+    try {
+      // Convert object to JSON string
+      const jsonString = JSON.stringify(data, null, 2);
+      
+      // Use our Unicode-safe encoding method
+      const base64Data = this.encodeUnicode(jsonString);
+      
+      // Create asset entry
+      const asset: AssetEntry = {
+        name,
+        data: base64Data,
+        type: 'application/json',
+        lastModified: Date.now()
+      };
+      
+      // Open database connection
+      const db = await this.openDB();
+      const storeName = DATA_STORE;
+      
+      // Store the asset
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction(storeName, 'readwrite');
+        const store = transaction.objectStore(storeName);
+        
+        transaction.oncomplete = () => {
+          db.close();
+          resolve({ 
+            success: true, 
+            message: `Successfully saved ${name} data.` 
+          });
+        };
+        
+        transaction.onerror = (event) => {
+          db.close();
+          reject(new Error(`Failed to save data ${name}`));
+        };
+        
+        // Add the asset (will update if it already exists)
+        store.put(asset);
+      });
+    } catch (error) {
+      console.error(`Error saving data object ${name}:`, error);
+      return { 
+        success: false, 
+        message: `Error saving data: ${error instanceof Error ? error.message : String(error)}` 
+      };
+    }
+  }
+  
   // Get a data object from a JSON asset
   static async getDataObject<T>(name: string): Promise<T | null> {
     if (!name) return null;
@@ -321,18 +396,41 @@ export class AssetManager {
     try {
       const asset = await this.getAssetByName('data', name);
       
-      if (asset) {
+      if (!asset) return null;
+      
+      // Multiple decoding strategies
+      let jsonString = '';
+      let result = null;
+      
+      // Strategy 1: Try our Unicode decoder
+      try {
+        jsonString = this.decodeUnicode(asset.data);
+        result = JSON.parse(jsonString);
+        return result;
+      } catch (e) {
+        console.warn(`Unicode decode failed for ${name}:`, e);
+      }
+      
+      // Strategy 2: Try direct atob
+      try {
+        jsonString = window.atob(asset.data);
+        result = JSON.parse(jsonString);
+        return result;
+      } catch (e) {
+        console.warn(`Direct atob decode failed for ${name}:`, e);
+      }
+      
+      // Strategy 3: Check if data is already JSON
+      if (asset.data.startsWith('{') || asset.data.startsWith('[')) {
         try {
-          // Parse the JSON data
-          const jsonString = atob(asset.data);
-          return JSON.parse(jsonString);
-        } catch (error) {
-          console.error(`Error parsing JSON data from asset ${name}:`, error);
-          return null;
+          result = JSON.parse(asset.data);
+          return result;
+        } catch (e) {
+          console.warn(`Direct JSON parse failed for ${name}:`, e);
         }
       }
       
-      // If asset not found, return null
+      console.error(`All decoding methods failed for ${name}`);
       return null;
     } catch (error) {
       console.error(`Error getting data object ${name}:`, error);
@@ -489,55 +587,6 @@ export class AssetManager {
     }
   }
   
-  // Add or update a data object (converts it to JSON and stores it)
-  static async saveDataObject<T>(name: string, data: T): Promise<{ success: boolean; message: string }> {
-    try {
-      // Convert object to JSON string
-      const jsonString = JSON.stringify(data, null, 2);
-      const base64Data = btoa(jsonString);
-      
-      // Create asset entry
-      const asset: AssetEntry = {
-        name,
-        data: base64Data,
-        type: 'application/json',
-        lastModified: Date.now()
-      };
-      
-      // Open database connection
-      const db = await this.openDB();
-      const storeName = DATA_STORE;
-      
-      // Store the asset
-      return new Promise((resolve, reject) => {
-        const transaction = db.transaction(storeName, 'readwrite');
-        const store = transaction.objectStore(storeName);
-        
-        transaction.oncomplete = () => {
-          db.close();
-          resolve({ 
-            success: true, 
-            message: `Successfully saved ${name} data.` 
-          });
-        };
-        
-        transaction.onerror = (event) => {
-          db.close();
-          reject(new Error(`Failed to save data ${name}`));
-        };
-        
-        // Add the asset (will update if it already exists)
-        store.put(asset);
-      });
-    } catch (error) {
-      console.error(`Error saving data object ${name}:`, error);
-      return { 
-        success: false, 
-        message: `Error saving data: ${error instanceof Error ? error.message : String(error)}` 
-      };
-    }
-  }
-  
   // Load example data when there's none
   static async loadExampleData(): Promise<{ success: boolean; message: string }> {
     try {
@@ -550,9 +599,13 @@ export class AssetManager {
       // Store in IndexedDB
       const dataStore = db.transaction(DATA_STORE, 'readwrite').objectStore(DATA_STORE);
       
+      // Use the simplified Unicode encoding approach
+      const jsonString = JSON.stringify(emptyLocations);
+      const base64Data = this.encodeUnicode(jsonString);
+      
       dataStore.add({
         name: 'locations.json',
-        data: btoa(JSON.stringify(emptyLocations)),
+        data: base64Data,
         type: 'application/json',
         lastModified: Date.now()
       });

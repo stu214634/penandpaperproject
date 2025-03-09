@@ -1,14 +1,37 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Grid, Card, CardContent, Typography, Button, Dialog, DialogContent } from '@mui/material';
+import { Box, Grid, Card, CardContent, Typography, Button, Dialog, DialogContent, Divider, Paper } from '@mui/material';
 import { useStore } from '../store';
 import { AudioTrackPanel } from '../components/AudioTrackPanel';
 import { AssetDropZone } from '../components/AssetDropZone';
 import { AssetManager } from '../services/assetManager';
+import MarkdownContent from '../components/MarkdownContent';
 
 export const Dashboard: React.FC = () => {
   const { locations, characters, combats } = useStore();
   const [isAssetManagerOpen, setIsAssetManagerOpen] = useState(false);
   const [audioAssetCount, setAudioAssetCount] = useState(0);
+  
+  // Markdown example for debugging
+  const markdownExample = `# Markdown Examples
+  
+## Basic Formatting
+**Bold text** and *italic text*
+
+## Lists
+* Item 1
+* Item 2
+  * Nested item
+
+## Links
+[Example Link](https://example.com)
+
+## Code
+\`\`\`
+function example() {
+  return "This is code";
+}
+\`\`\`
+`;
 
   useEffect(() => {
     // Load audio asset count
@@ -112,6 +135,37 @@ export const Dashboard: React.FC = () => {
           <AssetDropZone onAssetImport={handleAssetImport} />
         </DialogContent>
       </Dialog>
+
+      <Divider sx={{ my: 2 }} />
+      <Typography variant="h6" gutterBottom>Preview:</Typography>
+      <Paper sx={{ p: 2, bgcolor: 'background.default' }}>
+        <MarkdownContent content={markdownExample} debug={true} />
+      </Paper>
+      <Box sx={{ mt: 2, p: 2, bgcolor: 'rgba(0,0,0,0.05)', borderRadius: 1 }}>
+        <Typography variant="subtitle2" gutterBottom>
+          Troubleshooting Markdown Display:
+        </Typography>
+        <Typography variant="body2">
+          If markdown isn't displaying correctly in the deployed version, please:
+        </Typography>
+        <ul>
+          <li>
+            <Typography variant="body2">
+              Check the browser console for any errors (F12 &gt; Console)
+            </Typography>
+          </li>
+          <li>
+            <Typography variant="body2">
+              Try refreshing the page with cache clearing (Ctrl+F5 or Cmd+Shift+R)
+            </Typography>
+          </li>
+          <li>
+            <Typography variant="body2">
+              Temporarily disable any browser extensions that might interfere
+            </Typography>
+          </li>
+        </ul>
+      </Box>
     </Box>
   );
 }; 

@@ -38,6 +38,7 @@ import {
 } from '@mui/icons-material';
 import { useStore } from '../store';
 import { Combat, Character } from '../store';
+import MarkdownContent from './MarkdownContent';
 
 // Interface for combat participants with initiative
 interface CombatParticipant {
@@ -73,6 +74,7 @@ export const ActiveCombatView: React.FC<ActiveCombatViewProps> = ({ combat, onCl
   const [newParticipantId, setNewParticipantId] = useState('');
   const [newParticipantInitiative, setNewParticipantInitiative] = useState(10);
   const [editingParticipantId, setEditingParticipantId] = useState<string | null>(null);
+  const [selectedParticipantId, setSelectedParticipantId] = useState<string | null>(null);
   
   // Initialize audio only once when the component mounts
   useEffect(() => {
@@ -126,7 +128,7 @@ export const ActiveCombatView: React.FC<ActiveCombatViewProps> = ({ combat, onCl
     const playerParticipants = combat.playerCharacters.map(character => ({
       id: `pc-${character.id}-${Math.random().toString(36).substring(2, 9)}`,
       character,
-      initiative: Math.floor(Math.random() * 20) + 1, // Random initiative for initial setup
+      initiative: 0,
       currentHp: character.hp,
       maxHp: character.hp,
       notes: '',
@@ -160,14 +162,27 @@ export const ActiveCombatView: React.FC<ActiveCombatViewProps> = ({ combat, onCl
     const nextIndex = (currentTurnIndex + 1) % participants.length;
     setCurrentTurnIndex(nextIndex);
     
+    // When turn changes, update selected participant to match the current turn
+    setSelectedParticipantId(participants[nextIndex].id);
+    
     // If we've looped back to the first participant, increment the round
     if (nextIndex === 0) {
       setRound(prevRound => prevRound + 1);
     }
   };
   
-  // Get the current participant
+  // Get the current participant (whose turn it is)
   const currentParticipant = participants[currentTurnIndex];
+  
+  // Get the selected participant (for details panel)
+  const selectedParticipant = participants.find(p => p.id === (selectedParticipantId || currentParticipant?.id));
+  
+  // Update selectedParticipantId on initial load
+  useEffect(() => {
+    if (currentParticipant && !selectedParticipantId) {
+      setSelectedParticipantId(currentParticipant.id);
+    }
+  }, [currentParticipant]);
   
   // Handle adding a new participant to the combat
   const handleAddParticipant = () => {
@@ -260,6 +275,11 @@ export const ActiveCombatView: React.FC<ActiveCombatViewProps> = ({ combat, onCl
     
     setParticipants(updatedParticipants);
     setCurrentTurnIndex(newIndex);
+  };
+  
+  // Handle selecting a participant for viewing/editing
+  const handleSelectParticipant = (participantId: string) => {
+    setSelectedParticipantId(participantId);
   };
   
   // Handle closing the combat view
@@ -370,18 +390,27 @@ export const ActiveCombatView: React.FC<ActiveCombatViewProps> = ({ combat, onCl
                   mb: 1,
                   backgroundColor: index === currentTurnIndex 
                     ? 'rgba(255, 165, 0, 0.3)' 
-                    : 'transparent',
+                    : participant.id === selectedParticipantId && index !== currentTurnIndex
+                      ? 'rgba(25, 118, 210, 0.2)'
+                      : 'transparent',
                   borderLeft: index === currentTurnIndex 
                     ? '4px solid orange' 
-                    : '4px solid transparent',
+                    : participant.id === selectedParticipantId
+                      ? '4px solid #1976d2'
+                      : '4px solid transparent',
                   transition: 'all 0.3s ease',
-                  borderRadius: '4px'
+                  borderRadius: '4px',
+                  cursor: 'pointer'
                 }}
+                onClick={() => handleSelectParticipant(participant.id)}
                 secondaryAction={
                   <IconButton 
                     edge="end" 
                     size="small" 
-                    onClick={() => handleRemoveParticipant(participant.id)}
+                    onClick={(e) => {
+                      e.stopPropagation(); // Prevent triggering the ListItem click
+                      handleRemoveParticipant(participant.id);
+                    }}
                   >
                     <DeleteIcon fontSize="small" />
                   </IconButton>
@@ -406,7 +435,10 @@ export const ActiveCombatView: React.FC<ActiveCombatViewProps> = ({ combat, onCl
                         />
                         <IconButton 
                           size="small" 
-                          onClick={() => setEditingParticipantId(participant.id === editingParticipantId ? null : participant.id)}
+                          onClick={(e) => {
+                            e.stopPropagation(); // Prevent triggering the ListItem click
+                            setEditingParticipantId(participant.id === editingParticipantId ? null : participant.id);
+                          }}
                         >
                           <EditIcon fontSize="small" />
                         </IconButton>
@@ -452,7 +484,7 @@ export const ActiveCombatView: React.FC<ActiveCombatViewProps> = ({ combat, onCl
           </List>
         </Paper>
         
-        {/* Current turn details */}
+        {/* Active participant details */}
         <Paper sx={{ 
           flex: 1, 
           p: 2,
@@ -460,12 +492,22 @@ export const ActiveCombatView: React.FC<ActiveCombatViewProps> = ({ combat, onCl
           display: 'flex',
           flexDirection: 'column'
         }}>
-          {currentParticipant ? (
+          {selectedParticipant ? (
             <>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                <Typography variant="h5">
-                  Current Turn: {currentParticipant.character.name}
-                </Typography>
+                <Box>
+                  <Typography variant="h5">
+                    {selectedParticipant.id === currentParticipant?.id 
+                      ? `Current Turn: ${selectedParticipant.character.name}`
+                      : selectedParticipant.character.name
+                    }
+                  </Typography>
+                  {selectedParticipant.id !== currentParticipant?.id && (
+                    <Typography variant="caption" color="text.secondary">
+                      Viewing details - not the active turn
+                    </Typography>
+                  )}
+                </Box>
                 <Button 
                   variant="contained" 
                   color="secondary"
@@ -484,14 +526,21 @@ export const ActiveCombatView: React.FC<ActiveCombatViewProps> = ({ combat, onCl
                         Character Details
                       </Typography>
                       <Typography variant="body1">
-                        Type: {currentParticipant.character.type.toUpperCase()}
+                        Type: {selectedParticipant.character.type.toUpperCase()}
                       </Typography>
                       <Typography variant="body1">
-                        HP: {currentParticipant.currentHp}/{currentParticipant.maxHp}
+                        HP: {selectedParticipant.currentHp}/{selectedParticipant.maxHp}
                       </Typography>
-                      <Typography variant="body2" sx={{ mt: 2 }}>
-                        {currentParticipant.character.description}
-                      </Typography>
+                      <Box sx={{ mt: 2 }}>
+                        {selectedParticipant.character.descriptionType === 'markdown' && (
+                          <MarkdownContent content={selectedParticipant.character.description} />
+                        )}
+                        {(!selectedParticipant.character.descriptionType || selectedParticipant.character.descriptionType !== 'markdown') && (
+                          <Typography variant="body2">
+                            {selectedParticipant.character.description}
+                          </Typography>
+                        )}
+                      </Box>
                       
                       {/* HP adjustment controls */}
                       <Box sx={{ mt: 3 }}>
@@ -500,14 +549,14 @@ export const ActiveCombatView: React.FC<ActiveCombatViewProps> = ({ combat, onCl
                           <Button 
                             variant="outlined" 
                             size="small"
-                            onClick={() => handleUpdateHp(currentParticipant.id, currentParticipant.currentHp - 1)}
+                            onClick={() => handleUpdateHp(selectedParticipant.id, selectedParticipant.currentHp - 1)}
                           >
                             -1
                           </Button>
                           <Button 
                             variant="outlined" 
                             size="small"
-                            onClick={() => handleUpdateHp(currentParticipant.id, currentParticipant.currentHp - 5)}
+                            onClick={() => handleUpdateHp(selectedParticipant.id, selectedParticipant.currentHp - 5)}
                           >
                             -5
                           </Button>
@@ -515,7 +564,7 @@ export const ActiveCombatView: React.FC<ActiveCombatViewProps> = ({ combat, onCl
                             variant="outlined" 
                             color="primary"
                             size="small"
-                            onClick={() => handleUpdateHp(currentParticipant.id, currentParticipant.currentHp + 1)}
+                            onClick={() => handleUpdateHp(selectedParticipant.id, selectedParticipant.currentHp + 1)}
                           >
                             +1
                           </Button>
@@ -523,7 +572,7 @@ export const ActiveCombatView: React.FC<ActiveCombatViewProps> = ({ combat, onCl
                             variant="outlined" 
                             color="primary"
                             size="small"
-                            onClick={() => handleUpdateHp(currentParticipant.id, currentParticipant.currentHp + 5)}
+                            onClick={() => handleUpdateHp(selectedParticipant.id, selectedParticipant.currentHp + 5)}
                           >
                             +5
                           </Button>
@@ -543,8 +592,8 @@ export const ActiveCombatView: React.FC<ActiveCombatViewProps> = ({ combat, onCl
                         fullWidth
                         multiline
                         rows={8}
-                        value={currentParticipant.notes}
-                        onChange={(e) => handleUpdateNotes(currentParticipant.id, e.target.value)}
+                        value={selectedParticipant.notes}
+                        onChange={(e) => handleUpdateNotes(selectedParticipant.id, e.target.value)}
                         placeholder="Add notes for this character..."
                         variant="outlined"
                       />
@@ -552,7 +601,7 @@ export const ActiveCombatView: React.FC<ActiveCombatViewProps> = ({ combat, onCl
                   </Card>
                 </Grid>
                 
-                {currentParticipant.character.inventory && currentParticipant.character.inventory.length > 0 && (
+                {selectedParticipant.character.inventory && selectedParticipant.character.inventory.length > 0 && (
                   <Grid item xs={12}>
                     <Card sx={{ backgroundColor: 'rgba(40, 40, 40, 0.9)' }}>
                       <CardContent>
@@ -560,7 +609,7 @@ export const ActiveCombatView: React.FC<ActiveCombatViewProps> = ({ combat, onCl
                           Inventory
                         </Typography>
                         <List dense>
-                          {currentParticipant.character.inventory.map(item => (
+                          {selectedParticipant.character.inventory.map(item => (
                             <ListItem key={item.id}>
                               <ListItemText 
                                 primary={item.name} 

@@ -29,7 +29,8 @@ import {
   CircularProgress,
   Tabs,
   Tab,
-  Autocomplete
+  Autocomplete,
+  Tooltip
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
@@ -41,11 +42,13 @@ import InventoryIcon from '@mui/icons-material/Inventory';
 import PlaceIcon from '@mui/icons-material/Place';
 import SportsKabaddiIcon from '@mui/icons-material/SportsKabaddi';
 import VideogameAssetIcon from '@mui/icons-material/VideogameAsset';
+import HelpIcon from '@mui/icons-material/Help';
 import ReactMarkdown from 'react-markdown';
 import { useStore } from '../store';
 import { AudioTrackPanel } from '../components/AudioTrackPanel';
 import { AssetManager } from '../services/assetManager';
 import { Character } from '../store';
+import MarkdownContent from '../components/MarkdownContent';
 
 export const CharactersView: React.FC = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -263,9 +266,31 @@ export const CharactersView: React.FC = () => {
                   />
                 </Box>
                 
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 1, mb: 2 }}>
-                  {character.description}
-                </Typography>
+                <Box sx={{ mt: 1, mb: 2 }}>
+                  {character.descriptionType === 'markdown' && (
+                    <MarkdownContent 
+                      content={character.description} 
+                      sx={{
+                        '& table': {
+                          display: 'block',
+                          maxWidth: '100%',
+                          overflow: 'auto',
+                          whiteSpace: 'nowrap',
+                        },
+                        '& th, & td': {
+                          px: 1,
+                          py: 0.5,
+                          fontSize: '0.8rem',
+                        }
+                      }}
+                    />
+                  )}
+                  {character.descriptionType !== 'markdown' && (
+                    <Typography variant="body2" color="text.secondary">
+                      {character.description}
+                    </Typography>
+                  )}
+                </Box>
                 
                 {character.inventory && character.inventory.length > 0 && (
                   <>
@@ -390,7 +415,7 @@ export const CharactersView: React.FC = () => {
                   <MenuItem value="npc">NPC</MenuItem>
                   <MenuItem value="merchant">Merchant</MenuItem>
                   <MenuItem value="enemy">Enemy</MenuItem>
-                  <MenuItem value="play">Player Character</MenuItem>
+                  <MenuItem value="player">Player Character</MenuItem>
                 </Select>
               </FormControl>
             </Grid>
@@ -450,8 +475,27 @@ export const CharactersView: React.FC = () => {
             {newCharacter.descriptionType === 'markdown' ? (
               <>
                 <Grid item xs={12}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                    <Typography variant="subtitle2">Description</Typography>
+                    <Tooltip title={
+                      <>
+                        <Typography variant="caption" sx={{ display: 'block', fontWeight: 'bold' }}>
+                          Markdown Table Example:
+                        </Typography>
+                        <Typography variant="caption" component="pre" sx={{ display: 'block', mt: 1, fontFamily: 'monospace' }}>
+                          | Header 1 | Header 2 | Header 3 |\n
+                          | -------- | -------- | -------- |\n
+                          | Cell 1   | Cell 2   | Cell 3   |\n
+                          | Cell 4   | Cell 5   | Cell 6   |
+                        </Typography>
+                      </>
+                    }>
+                      <IconButton size="small" sx={{ ml: 1 }}>
+                        <HelpIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
                   <TextField
-                    label="Description"
                     multiline
                     rows={6}
                     fullWidth
@@ -474,9 +518,7 @@ export const CharactersView: React.FC = () => {
                       borderColor: 'divider'
                     }}
                   >
-                    <ReactMarkdown>
-                      {newCharacter.description}
-                    </ReactMarkdown>
+                    <MarkdownContent content={newCharacter.description} />
                   </Paper>
                 </Grid>
               </>
@@ -556,7 +598,7 @@ export const CharactersView: React.FC = () => {
                   <MenuItem value="npc">NPC</MenuItem>
                   <MenuItem value="merchant">Merchant</MenuItem>
                   <MenuItem value="enemy">Enemy</MenuItem>
-                  <MenuItem value="play">Player Character</MenuItem>
+                  <MenuItem value="player">Player Character</MenuItem>
                 </Select>
               </FormControl>
             </Grid>
@@ -616,8 +658,27 @@ export const CharactersView: React.FC = () => {
             {newCharacter.descriptionType === 'markdown' ? (
               <>
                 <Grid item xs={12}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                    <Typography variant="subtitle2">Description</Typography>
+                    <Tooltip title={
+                      <>
+                        <Typography variant="caption" sx={{ display: 'block', fontWeight: 'bold' }}>
+                          Markdown Table Example:
+                        </Typography>
+                        <Typography variant="caption" component="pre" sx={{ display: 'block', mt: 1, fontFamily: 'monospace' }}>
+                          | Header 1 | Header 2 | Header 3 |\n
+                          | -------- | -------- | -------- |\n
+                          | Cell 1   | Cell 2   | Cell 3   |\n
+                          | Cell 4   | Cell 5   | Cell 6   |
+                        </Typography>
+                      </>
+                    }>
+                      <IconButton size="small" sx={{ ml: 1 }}>
+                        <HelpIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
                   <TextField
-                    label="Description"
                     multiline
                     rows={6}
                     fullWidth
@@ -640,9 +701,7 @@ export const CharactersView: React.FC = () => {
                       borderColor: 'divider'
                     }}
                   >
-                    <ReactMarkdown>
-                      {newCharacter.description}
-                    </ReactMarkdown>
+                    <MarkdownContent content={newCharacter.description} />
                   </Paper>
                 </Grid>
               </>

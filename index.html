@@ -24,6 +24,43 @@
         }
       })();
     </script>
+    
+    <!-- Handle dynamic imports better -->
+    <script>
+      // Patch the import function to handle GitHub Pages path issues
+      (function() {
+        // Store the original import function
+        const originalImport = window.import;
+        
+        // Define a custom error handler for dynamic imports
+        window.handleImportError = function(err) {
+          console.error('Dynamic import failed:', err);
+          
+          // If the error is because of a 404 on GitHub Pages, try to fix the path
+          if (err.message && err.message.includes('Failed to fetch dynamically imported module')) {
+            console.log('Attempting to reload the application...');
+            setTimeout(() => {
+              window.location.href = '/penandpaperproject/';
+            }, 1000);
+          }
+          
+          return Promise.reject(err);
+        };
+
+        // Add event listener for unhandled errors that might be related to chunk loading
+        window.addEventListener('error', function(event) {
+          if (event.filename && event.filename.includes('.js') && 
+              (event.message.includes('Failed to fetch') || event.message.includes('ChunkLoadError'))) {
+            console.error('Chunk load error detected:', event);
+            
+            // Redirect to the homepage after a delay
+            setTimeout(() => {
+              window.location.href = '/penandpaperproject/';
+            }, 2000);
+          }
+        });
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
