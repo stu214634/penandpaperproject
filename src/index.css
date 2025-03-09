@@ -37,6 +37,59 @@ body {
   background-color: rgba(255, 255, 255, 0.5);
 }
 
+/* Input field styling */
+.MuiTextField-root {
+  transition: transform 0.2s ease;
+}
+
+.MuiTextField-root:focus-within {
+  transform: scale(1.01);
+}
+
+/* Number fields styling */
+.MuiTextField-root input[type="number"],
+.MuiTextField-root input[value]:not([value=""]) {
+  font-feature-settings: "tnum";
+  font-variant-numeric: tabular-nums;
+}
+
+/* Remove number input spinners in Chrome, Safari, Edge, Opera */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Remove number input spinners in Firefox */
+input[type=number] {
+  -moz-appearance: textfield;
+}
+
+/* Map background styling */
+.map-background {
+  background: linear-gradient(
+    135deg, 
+    #2c3e50, 
+    #1e3c72,
+    #2a5298,
+    #141e30
+  ) !important;
+  background-size: 400% 400% !important;
+  animation: gradientAnimation 15s ease infinite !important;
+}
+
+@keyframes gradientAnimation {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;

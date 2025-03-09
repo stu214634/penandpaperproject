@@ -75,7 +75,7 @@ export const CharactersView: React.FC = () => {
     locationId: '',
     descriptionType: 'markdown' as 'markdown' | 'image' | 'pdf',
     descriptionAssetName: '',
-    hp: 10  // Default HP value
+    hp: 10 as number | string  // Modified to allow string during editing
   });
   
   // Currently editing character id
@@ -98,7 +98,9 @@ export const CharactersView: React.FC = () => {
       name: newCharacter.name,
       description: newCharacter.description,
       type: newCharacter.type,
-      hp: Number(newCharacter.hp) || 1  // Cast to number and provide fallback
+      hp: typeof newCharacter.hp === 'string' 
+           ? (parseInt(newCharacter.hp) || 1) 
+           : (newCharacter.hp || 1)  // Ensure we always have a valid number
     };
     
     if (newCharacter.locationId) {
@@ -156,7 +158,9 @@ export const CharactersView: React.FC = () => {
         name: newCharacter.name,
         description: newCharacter.description,
         type: newCharacter.type,
-        hp: Number(newCharacter.hp) || 1,  // Cast to number and provide fallback
+        hp: typeof newCharacter.hp === 'string' 
+            ? (parseInt(newCharacter.hp) || 1) 
+            : (newCharacter.hp || 1),  // Ensure we always have a valid number
         descriptionType: newCharacter.descriptionType
       };
       
@@ -423,14 +427,38 @@ export const CharactersView: React.FC = () => {
             <Grid item xs={12} md={4}>
               <TextField
                 label="Hit Points (HP)"
-                type="number"
                 fullWidth
                 value={newCharacter.hp}
-                onChange={(e) => setNewCharacter({ 
-                  ...newCharacter, 
-                  hp: parseInt(e.target.value) || 1 
-                })}
-                inputProps={{ min: 1 }}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Allow empty string for easier editing
+                  if (value === '') {
+                    setNewCharacter({
+                      ...newCharacter,
+                      hp: ''
+                    });
+                  } else {
+                    // Try to parse as integer, but don't force conversion yet
+                    const parsed = parseInt(value);
+                    if (!isNaN(parsed)) {
+                      setNewCharacter({
+                        ...newCharacter,
+                        hp: parsed
+                      });
+                    }
+                  }
+                }}
+                onBlur={() => {
+                  // When field loses focus, ensure we have a valid number
+                  const hp = newCharacter.hp;
+                  if (hp === '' || hp === null || isNaN(Number(hp))) {
+                    setNewCharacter({
+                      ...newCharacter,
+                      hp: 1
+                    });
+                  }
+                }}
+                helperText="Minimum value is 1"
               />
             </Grid>
             
@@ -606,14 +634,38 @@ export const CharactersView: React.FC = () => {
             <Grid item xs={12} md={4}>
               <TextField
                 label="Hit Points (HP)"
-                type="number"
                 fullWidth
                 value={newCharacter.hp}
-                onChange={(e) => setNewCharacter({ 
-                  ...newCharacter, 
-                  hp: parseInt(e.target.value) || 1 
-                })}
-                inputProps={{ min: 1 }}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Allow empty string for easier editing
+                  if (value === '') {
+                    setNewCharacter({
+                      ...newCharacter,
+                      hp: ''
+                    });
+                  } else {
+                    // Try to parse as integer, but don't force conversion yet
+                    const parsed = parseInt(value);
+                    if (!isNaN(parsed)) {
+                      setNewCharacter({
+                        ...newCharacter,
+                        hp: parsed
+                      });
+                    }
+                  }
+                }}
+                onBlur={() => {
+                  // When field loses focus, ensure we have a valid number
+                  const hp = newCharacter.hp;
+                  if (hp === '' || hp === null || isNaN(Number(hp))) {
+                    setNewCharacter({
+                      ...newCharacter,
+                      hp: 1
+                    });
+                  }
+                }}
+                helperText="Minimum value is 1"
               />
             </Grid>
             

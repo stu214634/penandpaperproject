@@ -24,7 +24,8 @@ import {
   Select,
   FormControl,
   InputLabel,
-  Badge
+  Badge,
+  Autocomplete
 } from '@mui/material';
 import { 
   ArrowBack as ArrowBackIcon,
@@ -34,7 +35,8 @@ import {
   ArrowForward as ArrowForwardIcon,
   Close as CloseIcon,
   Delete as DeleteIcon,
-  Edit as EditIcon
+  Edit as EditIcon,
+  Store as StoreIcon
 } from '@mui/icons-material';
 import { useStore } from '../store';
 import { Combat, Character } from '../store';
@@ -44,8 +46,8 @@ import MarkdownContent from './MarkdownContent';
 interface CombatParticipant {
   id: string; // Unique ID for this participant instance
   character: Character;
-  initiative: number;
-  currentHp: number;
+  initiative: number | string;
+  currentHp: number | string;
   maxHp: number;
   notes: string;
   isPlayerCharacter: boolean;
@@ -72,7 +74,7 @@ export const ActiveCombatView: React.FC<ActiveCombatViewProps> = ({ combat, onCl
   const [round, setRound] = useState(1);
   const [isAddParticipantDialogOpen, setIsAddParticipantDialogOpen] = useState(false);
   const [newParticipantId, setNewParticipantId] = useState('');
-  const [newParticipantInitiative, setNewParticipantInitiative] = useState(10);
+  const [newParticipantInitiative, setNewParticipantInitiative] = useState<number | string>(10);
   const [editingParticipantId, setEditingParticipantId] = useState<string | null>(null);
   const [selectedParticipantId, setSelectedParticipantId] = useState<string | null>(null);
   
@@ -193,10 +195,14 @@ export const ActiveCombatView: React.FC<ActiveCombatViewProps> = ({ combat, onCl
     
     const isPlayerCharacter = character.type === 'player';
     
+    const initiative = typeof newParticipantInitiative === 'string' ? 
+      (parseInt(newParticipantInitiative) || 0) : 
+      newParticipantInitiative;
+    
     const newParticipant: CombatParticipant = {
       id: `${isPlayerCharacter ? 'pc' : 'enemy'}-${character.id}-${Math.random().toString(36).substring(2, 9)}`,
       character,
-      initiative: newParticipantInitiative,
+      initiative: initiative,
       currentHp: character.hp,
       maxHp: character.hp,
       notes: '',
@@ -204,42 +210,69 @@ export const ActiveCombatView: React.FC<ActiveCombatViewProps> = ({ combat, onCl
     };
     
     // Add to participants and resort by initiative
-    const updatedParticipants = [...participants, newParticipant]
-      .sort((a, b) => b.initiative - a.initiative);
+    const updatedParticipants = [...participants, newParticipant];
+    
+    // Sort participants by initiative
+    const sortedParticipants = sortParticipantsByInitiative(updatedParticipants);
     
     // Find the new index of the current participant to maintain turn
     const currentId = participants[currentTurnIndex]?.id;
     const newCurrentIndex = currentId 
-      ? updatedParticipants.findIndex(p => p.id === currentId)
+      ? sortedParticipants.findIndex(p => p.id === currentId)
       : 0;
     
-    setParticipants(updatedParticipants);
+    setParticipants(sortedParticipants);
     setCurrentTurnIndex(newCurrentIndex >= 0 ? newCurrentIndex : 0);
     setIsAddParticipantDialogOpen(false);
     setNewParticipantId('');
     setNewParticipantInitiative(10);
   };
   
+  // Sort participants by initiative (ensuring numeric comparison)
+  const sortParticipantsByInitiative = (participants: CombatParticipant[]) => {
+    return [...participants].sort((a, b) => {
+      const initA = typeof a.initiative === 'string' ? 
+        (parseInt(a.initiative) || 0) : a.initiative;
+      const initB = typeof b.initiative === 'string' ? 
+        (parseInt(b.initiative) || 0) : b.initiative;
+      return initB - initA;
+    });
+  };
+  
   // Handle updating a participant's initiative
-  const handleUpdateInitiative = (participantId: string, initiative: number) => {
+  const handleUpdateInitiative = (participantId: string, initiative: number | string) => {
+    // Convert string to number and ensure it's a valid number
+    const numInitiative = typeof initiative === 'string' ? 
+      (parseInt(initiative) || 0) : 
+      initiative;
+    
     const updatedParticipants = participants.map(p => 
-      p.id === participantId ? { ...p, initiative } : p
-    ).sort((a, b) => b.initiative - a.initiative);
+      p.id === participantId ? { ...p, initiative: numInitiative } : p
+    );
+    
+    // Sort participants by initiative
+    const sortedParticipants = sortParticipantsByInitiative(updatedParticipants);
     
     // Find the new index of the current participant to maintain turn
     const currentId = participants[currentTurnIndex]?.id;
     const newCurrentIndex = currentId 
-      ? updatedParticipants.findIndex(p => p.id === currentId)
+      ? sortedParticipants.findIndex(p => p.id === currentId)
       : 0;
     
-    setParticipants(updatedParticipants);
+    setParticipants(sortedParticipants);
     setCurrentTurnIndex(newCurrentIndex >= 0 ? newCurrentIndex : 0);
   };
   
   // Handle updating a participant's HP
-  const handleUpdateHp = (participantId: string, hp: number) => {
+  const handleUpdateHp = (participantId: string, hp: number | string) => {
+    const numHp = typeof hp === 'string' ? 
+      (parseInt(hp) || 0) : 
+      hp;
+    
     setParticipants(participants.map(p => 
-      p.id === participantId ? { ...p, currentHp: Math.max(0, Math.min(hp, p.maxHp)) } : p
+      p.id === participantId ? 
+        { ...p, currentHp: Math.max(0, Math.min(numHp, p.maxHp)) } : 
+        p
     ));
   };
   
@@ -297,6 +330,11 @@ export const ActiveCombatView: React.FC<ActiveCombatViewProps> = ({ combat, onCl
     
     // Call parent's onClose
     onClose();
+  };
+  
+  // Convert currentHp and initiative to numbers for display or calculations when needed
+  const displayHp = (hp: number | string): number => {
+    return typeof hp === 'string' ? (parseInt(hp) || 0) : hp;
   };
   
   return (
@@ -448,23 +486,66 @@ export const ActiveCombatView: React.FC<ActiveCombatViewProps> = ({ combat, onCl
                   secondary={
                     <Box>
                       <Typography variant="caption" component="div">
-                        HP: {participant.currentHp}/{participant.maxHp}
+                        HP: {displayHp(participant.currentHp)}/{participant.maxHp}
                       </Typography>
                       {editingParticipantId === participant.id && (
                         <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
                           <TextField
                             label="Initiative"
-                            type="number"
                             size="small"
                             value={participant.initiative}
-                            onChange={(e) => handleUpdateInitiative(participant.id, parseInt(e.target.value) || 0)}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              // Allow empty string for easier editing
+                              if (value === '') {
+                                handleUpdateInitiative(participant.id, '');
+                              } else {
+                                const parsed = parseInt(value);
+                                if (!isNaN(parsed)) {
+                                  handleUpdateInitiative(participant.id, parsed);
+                                }
+                              }
+                            }}
+                            onBlur={() => {
+                              // When field loses focus, ensure we have a valid number
+                              if (typeof participant.initiative === 'string' || isNaN(participant.initiative)) {
+                                handleUpdateInitiative(participant.id, 0);
+                              }
+                            }}
+                            inputProps={{
+                              min: 0,
+                              step: 1
+                            }}
+                            helperText="Higher initiative goes first"
                           />
                           <TextField
                             label="Current HP"
-                            type="number"
                             size="small"
                             value={participant.currentHp}
-                            onChange={(e) => handleUpdateHp(participant.id, parseInt(e.target.value) || 0)}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              // Allow empty string for easier editing
+                              if (value === '') {
+                                handleUpdateHp(participant.id, '');
+                              } else {
+                                const parsed = parseInt(value);
+                                if (!isNaN(parsed)) {
+                                  handleUpdateHp(participant.id, parsed);
+                                }
+                              }
+                            }}
+                            onBlur={() => {
+                              // When field loses focus, ensure we have a valid number
+                              if (typeof participant.currentHp === 'string' || isNaN(participant.currentHp)) {
+                                handleUpdateHp(participant.id, 0);
+                              }
+                            }}
+                            inputProps={{
+                              min: 0,
+                              max: participant.maxHp,
+                              step: 1
+                            }}
+                            helperText={`Max: ${participant.maxHp}`}
                           />
                           <TextField
                             label="Notes"
@@ -529,7 +610,7 @@ export const ActiveCombatView: React.FC<ActiveCombatViewProps> = ({ combat, onCl
                         Type: {selectedParticipant.character.type.toUpperCase()}
                       </Typography>
                       <Typography variant="body1">
-                        HP: {selectedParticipant.currentHp}/{selectedParticipant.maxHp}
+                        HP: {displayHp(selectedParticipant.currentHp)}/{selectedParticipant.maxHp}
                       </Typography>
                       <Box sx={{ mt: 2 }}>
                         {selectedParticipant.character.descriptionType === 'markdown' && (
@@ -549,14 +630,20 @@ export const ActiveCombatView: React.FC<ActiveCombatViewProps> = ({ combat, onCl
                           <Button 
                             variant="outlined" 
                             size="small"
-                            onClick={() => handleUpdateHp(selectedParticipant.id, selectedParticipant.currentHp - 1)}
+                            onClick={() => {
+                              const currentHp = displayHp(selectedParticipant.currentHp);
+                              handleUpdateHp(selectedParticipant.id, Math.max(0, currentHp - 1));
+                            }}
                           >
                             -1
                           </Button>
                           <Button 
                             variant="outlined" 
                             size="small"
-                            onClick={() => handleUpdateHp(selectedParticipant.id, selectedParticipant.currentHp - 5)}
+                            onClick={() => {
+                              const currentHp = displayHp(selectedParticipant.currentHp);
+                              handleUpdateHp(selectedParticipant.id, Math.max(0, currentHp - 5));
+                            }}
                           >
                             -5
                           </Button>
@@ -564,7 +651,10 @@ export const ActiveCombatView: React.FC<ActiveCombatViewProps> = ({ combat, onCl
                             variant="outlined" 
                             color="primary"
                             size="small"
-                            onClick={() => handleUpdateHp(selectedParticipant.id, selectedParticipant.currentHp + 1)}
+                            onClick={() => {
+                              const currentHp = displayHp(selectedParticipant.currentHp);
+                              handleUpdateHp(selectedParticipant.id, Math.min(selectedParticipant.maxHp, currentHp + 1));
+                            }}
                           >
                             +1
                           </Button>
@@ -572,7 +662,10 @@ export const ActiveCombatView: React.FC<ActiveCombatViewProps> = ({ combat, onCl
                             variant="outlined" 
                             color="primary"
                             size="small"
-                            onClick={() => handleUpdateHp(selectedParticipant.id, selectedParticipant.currentHp + 5)}
+                            onClick={() => {
+                              const currentHp = displayHp(selectedParticipant.currentHp);
+                              handleUpdateHp(selectedParticipant.id, Math.min(selectedParticipant.maxHp, currentHp + 5));
+                            }}
                           >
                             +5
                           </Button>
@@ -645,28 +738,67 @@ export const ActiveCombatView: React.FC<ActiveCombatViewProps> = ({ combat, onCl
         <DialogTitle>Add Combat Participant</DialogTitle>
         <DialogContent>
           <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <FormControl fullWidth>
-              <InputLabel>Character</InputLabel>
-              <Select
-                value={newParticipantId}
-                onChange={(e) => setNewParticipantId(e.target.value as string)}
-                label="Character"
-              >
-                <MenuItem value="" disabled>Select a character</MenuItem>
-                {characters.map(char => (
-                  <MenuItem key={char.id} value={char.id}>
-                    {char.name} ({char.type}) - HP: {char.hp}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            <Autocomplete
+              options={characters}
+              value={characters.find(char => char.id === newParticipantId) || null}
+              onChange={(_, newValue) => {
+                setNewParticipantId(newValue?.id || '');
+              }}
+              getOptionLabel={(option) => `${option.name} (${option.type}) - HP: ${option.hp}`}
+              renderOption={(props, option) => {
+                // Extract the key from props
+                const { key, ...otherProps } = props;
+                return (
+                  <li key={key} {...otherProps}>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      {option.type === 'npc' ? <PersonIcon color="primary" sx={{ mr: 1 }} /> : 
+                       option.type === 'merchant' ? <StoreIcon color="secondary" sx={{ mr: 1 }} /> :
+                       option.type === 'enemy' ? <SportsKabaddiIcon color="error" sx={{ mr: 1 }} /> :
+                       <PersonIcon color="success" sx={{ mr: 1 }} />}
+                      <Box>
+                        <Typography variant="body1">{option.name}</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {option.type.toUpperCase()} • HP: {option.hp}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </li>
+                );
+              }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Character"
+                  fullWidth
+                  helperText="Select a character to add to combat"
+                />
+              )}
+              isOptionEqualToValue={(option, value) => option.id === value.id}
+            />
             
             <TextField
               label="Initiative"
-              type="number"
               value={newParticipantInitiative}
-              onChange={(e) => setNewParticipantInitiative(parseInt(e.target.value) || 0)}
+              onChange={(e) => {
+                const value = e.target.value;
+                // Allow empty string for easier editing
+                if (value === '') {
+                  setNewParticipantInitiative('');
+                } else {
+                  const parsed = parseInt(value);
+                  if (!isNaN(parsed)) {
+                    setNewParticipantInitiative(parsed);
+                  }
+                }
+              }}
+              onBlur={() => {
+                // When field loses focus, ensure we have a valid number
+                if (newParticipantInitiative === '' || typeof newParticipantInitiative === 'string') {
+                  setNewParticipantInitiative(0);
+                }
+              }}
               fullWidth
+              helperText="Higher initiative goes first"
             />
           </Box>
         </DialogContent>

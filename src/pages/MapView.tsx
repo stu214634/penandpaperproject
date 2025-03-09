@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Box, 
@@ -47,7 +47,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
-import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
+import { TransformWrapper, TransformComponent, ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
 import { useStore } from '../store';
 import { CustomLocation, Character, Item, Combat } from '../store';
 import NorthIcon from '@mui/icons-material/North';
@@ -139,6 +139,13 @@ export const MapView: React.FC = () => {
   
   // Additional state for description dialog
   const [showDescriptionDialog, setShowDescriptionDialog] = useState(false);
+  
+  // Add a ref to access the transform state
+  const transformComponentRef = useRef<ReactZoomPanPinchRef | null>(null);
+  
+  // Add image dimensions state
+  const [imageNaturalWidth, setImageNaturalWidth] = useState(0);
+  const [imageNaturalHeight, setImageNaturalHeight] = useState(0);
   
   // Effect to initialize the selected location from the saved state
   useEffect(() => {
@@ -315,7 +322,7 @@ export const MapView: React.FC = () => {
     useStore.getState().saveDataToIndexedDB();
   };
   
-  // Handle location drag events
+  // Handle drag start
   const handleDragStart = (locationId: string, e: React.DragEvent) => {
     if (!editMode) return;
     
@@ -327,14 +334,16 @@ export const MapView: React.FC = () => {
     e.dataTransfer.setData('locationId', locationId);
     setIsDragging(true);
   };
-  
+
+  // Handle drag over event
   const handleDragOver = (e: React.DragEvent) => {
     if (!editMode) return;
     e.preventDefault();
   };
   
+  // Handle location drop
   const handleDrop = (e: React.DragEvent) => {
-    if (!editMode || !imageRef.current || !mapContainerRef.current) return;
+    if (!editMode || !mapContainerRef.current) return;
     e.preventDefault();
     
     const locationId = e.dataTransfer.getData('locationId');
@@ -345,14 +354,21 @@ export const MapView: React.FC = () => {
     const locationToUpdate = locations.find(loc => loc.id === locationId);
     if (!locationToUpdate) return;
     
-    // Calculate new coordinates
+    // We already reset the transform when entering edit mode,
+    // so we can simply use container-relative coordinates
     const rect = mapContainerRef.current.getBoundingClientRect();
+    
+    // Calculate coordinates as percentages within the container
     const x = (e.clientX - rect.left) / rect.width;
     const y = (e.clientY - rect.top) / rect.height;
     
+    // Ensure coordinates are within 0-1 range
+    const boundedX = Math.max(0, Math.min(1, x));
+    const boundedY = Math.max(0, Math.min(1, y));
+    
     // Update location coordinates
     const updateLocationFn = useStore.getState().updateLocation;
-    updateLocationFn(locationId, { coordinates: [x, y] });
+    updateLocationFn(locationId, { coordinates: [boundedX, boundedY] });
     
     // Save to IndexedDB
     useStore.getState().saveDataToIndexedDB();
@@ -360,8 +376,13 @@ export const MapView: React.FC = () => {
     setIsDragging(false);
   };
   
-  // Toggle edit mode
+  // Toggle edit mode and reset/restore zoom
   const toggleEditMode = () => {
+    // If entering edit mode, reset the transform
+    if (!editMode && transformComponentRef.current) {
+      transformComponentRef.current.resetTransform();
+    }
+    
     setEditMode(!editMode);
     
     // Close edit dialog if open
@@ -561,9 +582,7 @@ export const MapView: React.FC = () => {
   const getDirectionalArrows = () => {
     if (!selectedLocation) return null;
 
-    const worldWidth = useStore.getState().mapConfig.worldWidth;
-    const worldHeight = useStore.getState().mapConfig.worldHeight;
-    const circleRadius = 0.3; // Increased from 0.1 to 30% of container size
+    const circleRadius = Math.min(imageNaturalWidth, imageNaturalHeight) / 5000; // Increased from 0.1 to 30% of container size
 
     return locations
       .filter(loc => 
@@ -741,6 +760,7 @@ export const MapView: React.FC = () => {
                               '& h1, & h2, & h3, & h4, & h5, & h6': { fontSize: '0.9rem', my: 0.5 },
                               '& p': { my: 0.5 }
                             }}
+                            disableParaTags={true}
                           />
                         ) : (
                           npc.description.length > 80 ? `${npc.description.substring(0, 80)}...` : npc.description
@@ -791,7 +811,7 @@ export const MapView: React.FC = () => {
               </ListItem>
               
               <Collapse in={isExpanded} timeout="auto" unmountOnExit>
-                <List component="div" disablePadding>
+                <List component="span" disablePadding>
                   {npcs.map(npc => (
                     <ListItem 
                       key={npc.id}
@@ -835,6 +855,7 @@ export const MapView: React.FC = () => {
                                   '& h1, & h2, & h3, & h4, & h5, & h6': { fontSize: '0.9rem', my: 0.5 },
                                   '& p': { my: 0.5 }
                                 }}
+                                disableParaTags={true}
                               />
                             ) : (
                               npc.description.length > 80 ? `${npc.description.substring(0, 80)}...` : npc.description
@@ -951,18 +972,16 @@ export const MapView: React.FC = () => {
                 ) : null}
               >
                 <ListItemText 
-                  primary={
-                    editMode ? (
-                      <TextField
-                        size="small"
-                        value={item.name}
-                        onChange={(e) => handleUpdateItem(item.id, { name: e.target.value })}
-                        fullWidth
-                        variant="standard"
-                        margin="dense"
-                      />
-                    ) : item.name
-                  }
+                  primary={editMode ? (
+                    <TextField
+                      size="small"
+                      value={item.name}
+                      onChange={(e) => handleUpdateItem(item.id, { name: e.target.value })}
+                      fullWidth
+                      variant="standard"
+                      margin="dense"
+                    />
+                  ) : item.name}
                   secondary={
                     <>
                       {editMode ? (
@@ -1106,7 +1125,7 @@ export const MapView: React.FC = () => {
                       }}>
                         <Chip size="small" label={`Difficulty: ${combat.difficulty || 'Medium'}`} variant="outlined" />
                         {combat.description && combat.descriptionType === 'markdown' && (
-                          <Box sx={{ 
+                          <Box component="span" sx={{ 
                             display: '-webkit-box', 
                             WebkitLineClamp: 1, 
                             WebkitBoxOrient: 'vertical',
@@ -1123,11 +1142,13 @@ export const MapView: React.FC = () => {
                                 '& h1, & h2, & h3, & h4, & h5, & h6': { fontSize: '0.9rem', my: 0.5 },
                                 '& p': { my: 0.5 }
                               }}
+                              disableParaTags={true}
                             />
                           </Box>
                         )}
                       </Box>
                     }
+                    secondaryTypographyProps={{ component: 'span' }}
                   />
                 </ListItem>
               ))}
@@ -1172,7 +1193,7 @@ export const MapView: React.FC = () => {
               </ListItem>
               
               <Collapse in={isExpanded} timeout="auto" unmountOnExit>
-                <List component="div" disablePadding>
+                <List component="span" disablePadding>
                   {locationCombats.map(combat => (
                     <ListItem 
                       key={combat.id}
@@ -1204,7 +1225,7 @@ export const MapView: React.FC = () => {
                           }}>
                             <Chip size="small" label={`Difficulty: ${combat.difficulty || 'Medium'}`} variant="outlined" />
                             {combat.description && combat.descriptionType === 'markdown' && (
-                              <Box sx={{ 
+                              <Box component="span" sx={{ 
                                 display: '-webkit-box', 
                                 WebkitLineClamp: 1, 
                                 WebkitBoxOrient: 'vertical',
@@ -1221,11 +1242,13 @@ export const MapView: React.FC = () => {
                                     '& h1, & h2, & h3, & h4, & h5, & h6': { fontSize: '0.9rem', my: 0.5 },
                                     '& p': { my: 0.5 }
                                   }}
+                                  disableParaTags={true}
                                 />
                               </Box>
                             )}
                           </Box>
                         }
+                        secondaryTypographyProps={{ component: 'span' }}
                       />
                     </ListItem>
                   ))}
@@ -1302,7 +1325,23 @@ export const MapView: React.FC = () => {
                 <ListItemIcon>
                   <PersonIcon fontSize="small" />
                 </ListItemIcon>
-                <ListItemText primary={character.name} />
+                <ListItemText 
+                  primary={character.name} 
+                  secondary={
+                    character.descriptionType === 'markdown' ? (
+                      <MarkdownContent 
+                        content={character.description || ''} 
+                        sx={{ 
+                          fontSize: '0.8rem', 
+                          lineHeight: 1.2,
+                          '& h1, & h2, & h3, & h4, & h5, & h6': { fontSize: '0.9rem', my: 0.5 },
+                          '& p': { my: 0.5 }
+                        }}
+                        disableParaTags={true}
+                      />
+                    ) : null
+                  }
+                />
               </ListItem>
             ))}
           </List>
@@ -1329,7 +1368,24 @@ export const MapView: React.FC = () => {
                 </ListItemIcon>
                 <ListItemText 
                   primary={`${enemy.name} ${count > 1 ? `(x${count})` : ''}`} 
-                  secondary={`HP: ${enemy.hp}`}
+                  secondary={
+                    <>
+                      {enemy.descriptionType === 'markdown' ? (
+                        <MarkdownContent 
+                          content={`HP: ${enemy.hp}`} 
+                          sx={{ 
+                            fontSize: '0.8rem', 
+                            lineHeight: 1.2,
+                            '& h1, & h2, & h3, & h4, & h5, & h6': { fontSize: '0.9rem', my: 0.5 },
+                            '& p': { my: 0.5 }
+                          }}
+                          disableParaTags={true}
+                        />
+                      ) : (
+                        `HP: ${enemy.hp}`
+                      )}
+                    </>
+                  }
                 />
               </ListItem>
             ))}
@@ -1345,7 +1401,11 @@ export const MapView: React.FC = () => {
                 <ListItem key={item.id}>
                   <ListItemText 
                     primary={item.name} 
-                    secondary={`Quantity: ${item.quantity}`}
+                    secondary={
+                      <>
+                        {`Quantity: ${item.quantity}${item.description ? ` - ${item.description}` : ''}`}
+                      </>
+                    }
                   />
                 </ListItem>
               ))}
@@ -1649,12 +1709,12 @@ export const MapView: React.FC = () => {
       {/* Main content area */}
       <Box
         ref={mapContainerRef}
+        className="map-background"
         sx={{
           position: 'relative',
           flex: 1,
           height: '100%',
           overflow: 'hidden',
-          backgroundColor: 'black',
           zIndex: 1,
           cursor: editMode ? 'crosshair' : 'default'
         }}
@@ -1664,6 +1724,7 @@ export const MapView: React.FC = () => {
       >
         {isLoading ? (
           <Box 
+            className="map-background"
             sx={{ 
               width: '100%', 
               height: '100%', 
@@ -1671,7 +1732,6 @@ export const MapView: React.FC = () => {
               flexDirection: 'column',
               alignItems: 'center', 
               justifyContent: 'center',
-              backgroundColor: 'rgba(0, 0, 0, 0.2)'
             }}
           >
             <CircularProgress size={60} />
@@ -1681,6 +1741,7 @@ export const MapView: React.FC = () => {
           </Box>
         ) : !imageUrl || !selectedLocation ? (
           <Box 
+            className="map-background"
             sx={{ 
               width: '100%', 
               height: '100%', 
@@ -1688,7 +1749,6 @@ export const MapView: React.FC = () => {
               flexDirection: 'column',
               alignItems: 'center', 
               justifyContent: 'center',
-              backgroundColor: 'rgba(0, 0, 0, 0.1)'
             }}
           >
             <ImageNotSupportedIcon sx={{ fontSize: 60, opacity: 0.7 }} />
@@ -1708,6 +1768,7 @@ export const MapView: React.FC = () => {
             limitToBounds={false}
             disablePadding={true}
             disabled={editMode}
+            ref={transformComponentRef}
           >
             {() => (
               <>
@@ -1749,7 +1810,13 @@ export const MapView: React.FC = () => {
                         position: 'relative',
                         zIndex: 1,
                       }}
-                      onLoad={() => setIsImageLoading(false)}
+                      onLoad={(e) => {
+                        setIsImageLoading(false);
+                        // Store natural dimensions for coordinate calculations
+                        const img = e.target as HTMLImageElement;
+                        setImageNaturalWidth(img.naturalWidth);
+                        setImageNaturalHeight(img.naturalHeight);
+                      }}
                       onError={() => setIsImageLoading(false)}
                     />
                     {renderLocationMarkers()}

@@ -64,7 +64,7 @@ export const LocationsView: React.FC = () => {
     imageUrl: '',
     descriptionType: 'markdown' as 'markdown' | 'image' | 'pdf',
     parentLocationId: '',
-    coordinates: [0, 0] as [number, number],
+    coordinates: [0, 0] as [number | string, number | string],
     mixWithParent: false,
     connectedLocations: [] as string[]
   });
@@ -125,7 +125,9 @@ export const LocationsView: React.FC = () => {
       entrySound: newLocation.entrySound || undefined,
       imageUrl: newLocation.imageUrl || undefined,
       descriptionType: newLocation.descriptionType,
-      coordinates: newLocation.coordinates.every(coord => coord !== 0) ? newLocation.coordinates : undefined,
+      coordinates: typeof newLocation.coordinates[0] === 'number' && typeof newLocation.coordinates[1] === 'number' 
+        ? newLocation.coordinates as [number, number] 
+        : [0, 0],
       parentLocationId: newLocation.parentLocationId || undefined,
       mixWithParent: newLocation.mixWithParent,
       connectedLocations: newLocation.connectedLocations.length > 0 ? newLocation.connectedLocations : undefined
@@ -145,7 +147,7 @@ export const LocationsView: React.FC = () => {
       imageUrl: '',
       descriptionType: 'markdown' as 'markdown' | 'image' | 'pdf',
       parentLocationId: '',
-      coordinates: [0, 0],
+      coordinates: [0, 0] as [number | string, number | string],
       mixWithParent: false,
       connectedLocations: []
     });
@@ -171,7 +173,7 @@ export const LocationsView: React.FC = () => {
         imageUrl: location.imageUrl || '',
         descriptionType: location.descriptionType || 'markdown',
         parentLocationId: location.parentLocationId || '',
-        coordinates: location.coordinates || [0, 0],
+        coordinates: location.coordinates || [0, 0] as [number | string, number | string],
         mixWithParent: location.mixWithParent || false,
         connectedLocations: location.connectedLocations || []
       });
@@ -189,7 +191,9 @@ export const LocationsView: React.FC = () => {
         entrySound: newLocation.entrySound || undefined,
         imageUrl: newLocation.imageUrl || undefined,
         descriptionType: newLocation.descriptionType,
-        coordinates: newLocation.coordinates.every(coord => coord !== 0) ? newLocation.coordinates : undefined,
+        coordinates: typeof newLocation.coordinates[0] === 'number' && typeof newLocation.coordinates[1] === 'number' 
+          ? newLocation.coordinates as [number, number] 
+          : [0, 0],
         parentLocationId: newLocation.parentLocationId || undefined,
         mixWithParent: newLocation.mixWithParent,
         connectedLocations: newLocation.connectedLocations.length > 0 ? newLocation.connectedLocations : undefined
@@ -702,31 +706,83 @@ export const LocationsView: React.FC = () => {
                 <Grid item xs={6}>
                   <TextField
                     label="X Coordinate"
-                    type="number"
                     fullWidth
                     value={newLocation.coordinates[0]}
-                    onChange={(e) => setNewLocation({
-                      ...newLocation,
-                      coordinates: [parseFloat(e.target.value), newLocation.coordinates[1]]
-                    })}
-                    InputProps={{
-                      inputProps: { min: 0, max: 1, step: 0.01 }
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      // Allow empty string for easier editing
+                      if (value === '') {
+                        setNewLocation({
+                          ...newLocation,
+                          coordinates: ['', newLocation.coordinates[1]]
+                        });
+                      } else {
+                        const parsed = parseFloat(value);
+                        if (!isNaN(parsed)) {
+                          setNewLocation({
+                            ...newLocation,
+                            coordinates: [parsed, newLocation.coordinates[1]]
+                          });
+                        }
+                      }
                     }}
+                    onBlur={() => {
+                      // When field loses focus, ensure we have a valid number
+                      const x = newLocation.coordinates[0];
+                      if (x === '' || x === null || isNaN(Number(x))) {
+                        setNewLocation({
+                          ...newLocation,
+                          coordinates: [0, newLocation.coordinates[1]]
+                        });
+                      }
+                    }}
+                    InputProps={{
+                      inputProps: { 
+                        step: 0.01,
+                      }
+                    }}
+                    helperText={newLocation.parentLocationId ? "Value between 0-1 (0.5 is center)" : undefined}
                   />
                 </Grid>
                 <Grid item xs={6}>
                   <TextField
                     label="Y Coordinate"
-                    type="number"
                     fullWidth
                     value={newLocation.coordinates[1]}
-                    onChange={(e) => setNewLocation({
-                      ...newLocation,
-                      coordinates: [newLocation.coordinates[0], parseFloat(e.target.value)]
-                    })}
-                    InputProps={{
-                      inputProps: { min: 0, max: 1, step: 0.01 }
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      // Allow empty string for easier editing
+                      if (value === '') {
+                        setNewLocation({
+                          ...newLocation,
+                          coordinates: [newLocation.coordinates[0], '']
+                        });
+                      } else {
+                        const parsed = parseFloat(value);
+                        if (!isNaN(parsed)) {
+                          setNewLocation({
+                            ...newLocation,
+                            coordinates: [newLocation.coordinates[0], parsed]
+                          });
+                        }
+                      }
                     }}
+                    onBlur={() => {
+                      // When field loses focus, ensure we have a valid number
+                      const y = newLocation.coordinates[1];
+                      if (y === '' || y === null || isNaN(Number(y))) {
+                        setNewLocation({
+                          ...newLocation,
+                          coordinates: [newLocation.coordinates[0], 0]
+                        });
+                      }
+                    }}
+                    InputProps={{
+                      inputProps: { 
+                        step: 0.01,
+                      }
+                    }}
+                    helperText={newLocation.parentLocationId ? "Value between 0-1 (0.5 is center)" : undefined}
                   />
                 </Grid>
               </Grid>
@@ -955,31 +1011,83 @@ export const LocationsView: React.FC = () => {
                 <Grid item xs={6}>
                   <TextField
                     label="X Coordinate"
-                    type="number"
                     fullWidth
                     value={newLocation.coordinates[0]}
-                    onChange={(e) => setNewLocation({
-                      ...newLocation,
-                      coordinates: [parseFloat(e.target.value), newLocation.coordinates[1]]
-                    })}
-                    InputProps={{
-                      inputProps: { min: 0, max: 1, step: 0.01 }
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      // Allow empty string for easier editing
+                      if (value === '') {
+                        setNewLocation({
+                          ...newLocation,
+                          coordinates: ['', newLocation.coordinates[1]]
+                        });
+                      } else {
+                        const parsed = parseFloat(value);
+                        if (!isNaN(parsed)) {
+                          setNewLocation({
+                            ...newLocation,
+                            coordinates: [parsed, newLocation.coordinates[1]]
+                          });
+                        }
+                      }
                     }}
+                    onBlur={() => {
+                      // When field loses focus, ensure we have a valid number
+                      const x = newLocation.coordinates[0];
+                      if (x === '' || x === null || isNaN(Number(x))) {
+                        setNewLocation({
+                          ...newLocation,
+                          coordinates: [0, newLocation.coordinates[1]]
+                        });
+                      }
+                    }}
+                    InputProps={{
+                      inputProps: { 
+                        step: 0.01,
+                      }
+                    }}
+                    helperText={newLocation.parentLocationId ? "Value between 0-1 (0.5 is center)" : undefined}
                   />
                 </Grid>
                 <Grid item xs={6}>
                   <TextField
                     label="Y Coordinate"
-                    type="number"
                     fullWidth
                     value={newLocation.coordinates[1]}
-                    onChange={(e) => setNewLocation({
-                      ...newLocation,
-                      coordinates: [newLocation.coordinates[0], parseFloat(e.target.value)]
-                    })}
-                    InputProps={{
-                      inputProps: { min: 0, max: 1, step: 0.01 }
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      // Allow empty string for easier editing
+                      if (value === '') {
+                        setNewLocation({
+                          ...newLocation,
+                          coordinates: [newLocation.coordinates[0], '']
+                        });
+                      } else {
+                        const parsed = parseFloat(value);
+                        if (!isNaN(parsed)) {
+                          setNewLocation({
+                            ...newLocation,
+                            coordinates: [newLocation.coordinates[0], parsed]
+                          });
+                        }
+                      }
                     }}
+                    onBlur={() => {
+                      // When field loses focus, ensure we have a valid number
+                      const y = newLocation.coordinates[1];
+                      if (y === '' || y === null || isNaN(Number(y))) {
+                        setNewLocation({
+                          ...newLocation,
+                          coordinates: [newLocation.coordinates[0], 0]
+                        });
+                      }
+                    }}
+                    InputProps={{
+                      inputProps: { 
+                        step: 0.01,
+                      }
+                    }}
+                    helperText={newLocation.parentLocationId ? "Value between 0-1 (0.5 is center)" : undefined}
                   />
                 </Grid>
               </Grid>

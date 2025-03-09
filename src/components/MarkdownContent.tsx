@@ -9,6 +9,7 @@ interface MarkdownContentProps {
   content: string;
   sx?: any;
   debug?: boolean;
+  disableParaTags?: boolean;
 }
 
 // Utility function to detect if a string contains markdown
@@ -61,7 +62,7 @@ const SimpleMarkdownRenderer: React.FC<{content: string}> = ({ content }) => {
   );
 };
 
-const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, sx, debug = false }) => {
+const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, sx, debug = false, disableParaTags = false }) => {
   const [error, setError] = useState<boolean>(false);
   const [markdownDetected, setMarkdownDetected] = useState<boolean>(false);
   const [useSimpleRenderer, setUseSimpleRenderer] = useState<boolean>(false);
@@ -104,6 +105,17 @@ const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, sx, debug = 
       <Typography sx={{ whiteSpace: 'pre-wrap', ...sx }}>
         {content}
       </Typography>
+    );
+  }
+
+  // For cases where this component will be nested in a <p> tag (like in ListItemText),
+  // use a simplified plain text approach to avoid DOM nesting errors
+  if (disableParaTags) {
+    // Just render the content as plain text with minimal formatting
+    return (
+      <span style={{ whiteSpace: 'normal' }}>
+        {content.replace(/\n/g, ' ').replace(/\s+/g, ' ')}
+      </span>
     );
   }
 
@@ -181,7 +193,9 @@ const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, sx, debug = 
           ...sx,
         }}
       >
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+          {content}
+        </ReactMarkdown>
       </Box>
     );
   } catch (err) {
